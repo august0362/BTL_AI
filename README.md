@@ -1,10 +1,12 @@
 # Chess AI Tournament
 
 ## Chạy nhanh
+Cài Python 3.13, mở terminal tại thư mục dự án rồi chạy:
+winget install -e --id Python.Python.3.13
 
-Trên Windows, double-click `run.bat` để tạo môi trường, cài dependencies khi cần và mở game. Lần cài đầu có thể mất vài phút, nhất là PyTorch.
+Trên Windows, double-click `run.bat` (bắt buộc) để tạo môi trường, cài dependencies khi cần và mở game. Lần cài đầu có thể mất vài phút, nhất là PyTorch.
 
-- `run.bat --test`: cài công cụ phát triển nếu cần rồi chạy toàn bộ pytest.
+- `run.bat --test`: cài công cụ phát triển nếu cần rồi chạy toàn bộ pytest. (bắt buộc)
 - `run.bat --reinstall`: cài lại dependencies.
 
 ## Giới thiệu
@@ -18,12 +20,11 @@ Dự án là game cờ vua cho bốn AI độc lập và người chơi:
 ## Cài đặt thủ công
 
 Cài Python 3.13, mở terminal tại thư mục dự án rồi chạy:
-
-```bat
+winget install -e --id Python.Python.3.13
 py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r environments\requirements-dev.txt
 .venv\Scripts\python main.py
-```
+
 
 Để mở game thủ công sau đó: `.venv\Scripts\python main.py`.
 
@@ -46,17 +47,6 @@ BTL_AI/
 - Phân công, vùng được sửa, bàn cờ đầu vào và Git/PR: [CONTRIBUTING](documents/CONTRIBUTING.md).
 - Chạy toàn bộ kiểm tra cục bộ: `another\scripts\test.bat`.
 
-## Tài liệu
-
-| File | Nội dung |
-|---|---|
-| [documents/CONTEXT.md](documents/CONTEXT.md) | Kiến trúc, hợp đồng giao diện, quy tắc — **đọc trước khi code** |
-| [documents/TASKS.md](documents/TASKS.md) | Lộ trình và checklist công việc |
-| [documents/CHANGELOG.md](documents/CHANGELOG.md) | Nhật ký quyết định và thay đổi |
-| [documents/USER_GUIDE.md](documents/USER_GUIDE.md) | Hướng dẫn sử dụng game |
-| [documents/CONTRIBUTING.md](documents/CONTRIBUTING.md) | Phân công, hợp đồng bot và quy trình đóng góp |
-| [documents/DEEP_RL_DESIGN.md](documents/DEEP_RL_DESIGN.md) | Option 4: ranh giới bạn tự viết / hạ tầng có sẵn |
-| [documents/RL_LEARNING_GUIDE.md](documents/RL_LEARNING_GUIDE.md) | Lộ trình học RL cho Option 4 |
 
 ## Credits
 
