@@ -1,0 +1,15 @@
+# Ai được duyệt thay đổi ở đâu.
+# Mỗi dòng: <đường dẫn>  <@username GitHub> ...  — PR chạm vào đường dẫn cần 1 người trong danh sách approve.
+# Dòng ở DƯỚI được ưu tiên hơn dòng ở trên.
+# Thành viên thứ 3 phụ trách MCTS.
+
+*                          @august0362
+
+/backend/ai/alphabeta_regression/  @cieldontcry    @august0362
+/backend/ai/genetic_alphabeta/     @khanhtaduy2k5  @august0362
+/backend/ai/mcts/                  @quanganh167    @august0362
+/backend/ai/deep_rl/               @august0362
+
+/.github/                  @august0362
+/documents/                @august0362
+/pyproject.toml            @august0362

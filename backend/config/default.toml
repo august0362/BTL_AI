@@ -1,0 +1,45 @@
+# Cấu hình mặc định — được commit.
+# Muốn đổi trên máy mình: tạo backend/config/local.toml và chỉ ghi các khóa cần đổi (file đó bị .gitignore).
+
+[window]
+width = 960
+height = 640
+fps = 60
+
+[game]
+random_opening_plies = 2   # chỉ Bot vs Bot. Đơn vị: nửa nước (2 = mỗi bên 1 nước)
+max_plies = 300            # quá số nửa nước này thì xử hòa
+claim_draw = true          # tự hòa khi lặp 3 lần / luật 50 nước
+
+[ranking]
+elo_initial = 1200
+elo_k = 32
+
+[history]
+max_games = 20
+
+[ui]
+language = "vi"            # "vi" | "en"
+sound_enabled = false
+piece_set = "rhosgfx"
+theme = "dark_winter"       # id theme (CONTEXT §5.12, §5.13); màu bàn cờ lấy theo theme
+bot_move_delay_ms = 300    # độ trễ tối thiểu giữa các nước Bot vs Bot
+replay_delay_ms = 800
+show_debug_bots = false
+
+[eval_bar]
+scale = 8.0                # giá trị thanh = tanh(chênh lệch quân / scale)
+
+# Mỗi bot có bảng [bots.<bot_id>]; nội dung được truyền vào BaseBot(config=...).
+[bots.random]
+
+[bots.alphabeta_regression]
+
+[bots.genetic_alphabeta]
+
+[bots.mcts]
+
+[bots.deep_rl]
+weights_url = ""           # link asset trên GitHub Release
+weights_sha256 = ""
+device = "cpu"

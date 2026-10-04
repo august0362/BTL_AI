@@ -1,0 +1,65 @@
+[project]
+name = "chess-ai-tournament"
+version = "0.0.1"
+description = "Giải đấu cờ vua giữa 4 AI và người chơi"
+requires-python = ">=3.13"
+
+# ------------------------------------------------------------------ ruff
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["backend", "frontend", "another"]
+extend-exclude = ["another/local_tools", "database/data"]
+
+[tool.ruff.format]
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+# ------------------------------------------------------------------ pytest
+[tool.pytest.ini_options]
+testpaths = ["another/tests"]
+pythonpath = ["backend", "frontend", "another"]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["core", "tournament"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+# ------------------------------------------------------------------ import-linter
+# Ranh giới module — xem documents/CONTEXT.md §3.1. CI chạy: lint-imports
+# Tên contract để ASCII: console Windows không in được tiếng Việt.
+[tool.importlinter]
+root_packages = ["core", "ai", "tournament", "gui"]
+
+[[tool.importlinter.contracts]]
+name = "Layers: gui -> tournament -> ai -> core (import downward only)"
+type = "layers"
+layers = ["gui", "tournament", "ai", "core"]
+
+[[tool.importlinter.contracts]]
+name = "Bots are independent of each other"
+type = "independence"
+modules = [
+    "ai.random_bot",
+    "ai.alphabeta_regression",
+    "ai.genetic_alphabeta",
+    "ai.mcts",
+    "ai.deep_rl",
+]
+
+[[tool.importlinter.contracts]]
+name = "tournament/gui load bots only via ai.registry"
+type = "forbidden"
+source_modules = ["tournament", "gui"]
+forbidden_modules = [
+    "ai.random_bot",
+    "ai.alphabeta_regression",
+    "ai.genetic_alphabeta",
+    "ai.mcts",
+    "ai.deep_rl",
+]

@@ -1,0 +1,10 @@
+# Thống nhất xuống dòng LF cho mọi file văn bản (tránh diff/xung đột ảo giữa Windows và Linux).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.svg text
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.bat text eol=crlf

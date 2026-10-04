@@ -1,0 +1,56 @@
+# ---------- Dữ liệu cá nhân / cục bộ (KHÔNG BAO GIỜ commit) ----------
+# bảng xếp hạng, lịch sử ván
+database/data/
+# giải round-robin cá nhân của @august0362
+another/local_tools/
+# cấu hình ghi đè trên máy cá nhân
+backend/config/local.toml
+
+# ---------- Trọng số mô hình (phát hành qua GitHub Release) ----------
+backend/ai/*/weights/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+*.pkl
+*.npz
+
+# ---------- Kaggle / notebook ----------
+.ipynb_checkpoints/
+kaggle.json
+wandb/
+runs/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# ---------- Công cụ test / lint ----------
+.pytest_cache/
+.ruff_cache/
+.import_linter_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ---------- IDE / hệ điều hành ----------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Bí mật ----------
+.env
+*.key
+.pytest-tmp*/
+.preview/

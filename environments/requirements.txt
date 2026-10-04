@@ -1,0 +1,6 @@
+# Thư viện chạy game. Thêm thư viện mới => ghi rõ tên, phiên bản, lý do trong mô tả PR.
+chess~=1.11
+pygame-ce~=2.5
+tomli-w~=1.2          # ghi config/local.toml (tomllib có sẵn chỉ đọc được)
+numpy~=2.5
+torch~=2.14           # Option 4 (Deep RL). Trên CI Linux cài bản CPU, xem ci.yml

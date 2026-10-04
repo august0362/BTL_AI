@@ -1,0 +1,51 @@
+# CI — chạy mỗi lần push lên bất kỳ branch nào và mỗi Pull Request vào main.
+# Với pull_request, GitHub chạy trên bản ĐÃ GHÉP THỬ với main => bắt được lỗi tích hợp.
+# Tên job "ci" là tên check bắt buộc trong Ruleset main-protect (documents/CONTEXT.md §8.2).
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: backend:frontend:another
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: environments/.python-version
+          cache: pip
+          cache-dependency-path: |
+            environments/requirements.txt
+            environments/requirements-dev.txt
+
+      - name: Cài đặt sạch (torch bản CPU cho nhẹ)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r environments/requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Ranh giới module (import-linter)
+        run: lint-imports
+
+      - name: Test + coverage (core/, tournament/ >= 80%)
+        run: pytest --cov --cov-report=term-missing
