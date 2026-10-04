@@ -1,10 +1,12 @@
 # Chess AI Tournament
 
 ## Chạy nhanh
+Cài Python 3.13, mở terminal tại thư mục dự án rồi chạy:
+winget install -e --id Python.Python.3.13
 
-Trên Windows, double-click `run.bat` để tạo môi trường, cài dependencies khi cần và mở game. Lần cài đầu có thể mất vài phút, nhất là PyTorch.
+Trên Windows, double-click `run.bat` (bắt buộc) để tạo môi trường, cài dependencies khi cần và mở game. Lần cài đầu có thể mất vài phút, nhất là PyTorch.
 
-- `run.bat --test`: cài công cụ phát triển nếu cần rồi chạy toàn bộ pytest.
+- `run.bat --test`: cài công cụ phát triển nếu cần rồi chạy toàn bộ pytest. (bắt buộc)
 - `run.bat --reinstall`: cài lại dependencies.
 
 ## Giới thiệu
@@ -18,12 +20,11 @@ Dự án là game cờ vua cho bốn AI độc lập và người chơi:
 ## Cài đặt thủ công
 
 Cài Python 3.13, mở terminal tại thư mục dự án rồi chạy:
-
-```bat
+winget install -e --id Python.Python.3.13
 py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r environments\requirements-dev.txt
 .venv\Scripts\python main.py
-```
+
 
 Để mở game thủ công sau đó: `.venv\Scripts\python main.py`.
 
