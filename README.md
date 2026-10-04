@@ -47,6 +47,7 @@ BTL_AI/
 - Phân công, vùng được sửa, bàn cờ đầu vào và Git/PR: [CONTRIBUTING](documents/CONTRIBUTING.md).
 - Chạy toàn bộ kiểm tra cục bộ: `another\scripts\test.bat`.
 
+
 ## Credits
 
 Xem [frontend/gui/assets/CREDITS.md](frontend/gui/assets/CREDITS.md).
