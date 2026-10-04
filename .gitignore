@@ -54,3 +54,7 @@ desktop.ini
 *.key
 .pytest-tmp*/
 .preview/
+
+# Linux run script & venv
+run.sh
+.venv/
