@@ -25,7 +25,6 @@ py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r environments\requirements-dev.txt
 .venv\Scripts\python main.py
 
-
 Để mở game thủ công sau đó: `.venv\Scripts\python main.py`.
 
 ## Cấu trúc thư mục
