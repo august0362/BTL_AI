@@ -9,7 +9,11 @@ Trên Windows, double-click `run.bat` để tạo môi trường, cài dependenc
 
 ## Giới thiệu
 
-Dự án là game cờ vua cho bốn AI độc lập và người chơi: Alpha-Beta + Linear Regression (Option 1), Alpha-Beta + Genetic Algorithm (Option 2), Pure MCTS (Option 3), và Deep Reinforcement Learning/DQN (Option 4). Dự án dùng Python 3.13; luật cờ do `python-chess` đảm nhiệm.
+Dự án là game cờ vua cho bốn AI độc lập và người chơi: 
+- Alpha-Beta + Linear Regression (Option 1)
+- Alpha-Beta + Genetic Algorithm (Option 2)
+- Pure MCTS (Option 3)
+- Deep Reinforcement Learning/DQN (Option 4). Dự án dùng Python 3.13; luật cờ do `python-chess` đảm nhiệm.
 
 ## Cài đặt thủ công
 
