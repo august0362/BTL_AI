@@ -47,18 +47,6 @@ BTL_AI/
 - Phân công, vùng được sửa, bàn cờ đầu vào và Git/PR: [CONTRIBUTING](documents/CONTRIBUTING.md).
 - Chạy toàn bộ kiểm tra cục bộ: `another\scripts\test.bat`.
 
-## Tài liệu
-
-| File | Nội dung |
-|---|---|
-| [documents/CONTEXT.md](documents/CONTEXT.md) | Kiến trúc, hợp đồng giao diện, quy tắc — **đọc trước khi code** |
-| [documents/TASKS.md](documents/TASKS.md) | Lộ trình và checklist công việc |
-| [documents/CHANGELOG.md](documents/CHANGELOG.md) | Nhật ký quyết định và thay đổi |
-| [documents/USER_GUIDE.md](documents/USER_GUIDE.md) | Hướng dẫn sử dụng game |
-| [documents/CONTRIBUTING.md](documents/CONTRIBUTING.md) | Phân công, hợp đồng bot và quy trình đóng góp |
-| [documents/DEEP_RL_DESIGN.md](documents/DEEP_RL_DESIGN.md) | Option 4: ranh giới bạn tự viết / hạ tầng có sẵn |
-| [documents/RL_LEARNING_GUIDE.md](documents/RL_LEARNING_GUIDE.md) | Lộ trình học RL cho Option 4 |
-
 ## Credits
 
 Xem [frontend/gui/assets/CREDITS.md](frontend/gui/assets/CREDITS.md).
