@@ -1,0 +1,10 @@
+{
+  "pawn": 1.0,
+  "knight": 3.0,
+  "bishop": 3.0,
+  "rook": 5.0,
+  "queen": 9.0,
+  "center": 0.12,
+  "mobility": 0.02,
+  "shield": 0.1
+}
