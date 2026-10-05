@@ -58,3 +58,6 @@ desktop.ini
 # Linux run script & venv
 run.sh
 .venv/
+
+DEEP_RL_DESIGN.md
+RL_LEARNING_GUIDE.md
