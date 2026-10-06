@@ -8,7 +8,7 @@ import pygame
 from gui.assets_loader import piece_image
 from gui.i18n import Translator
 from gui.render import Render
-from gui.theme import THEMES, Theme
+from frontend.gui.theme import THEMES, Theme
 
 
 class PromotionDialog:

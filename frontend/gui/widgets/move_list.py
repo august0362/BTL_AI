@@ -5,7 +5,7 @@ from __future__ import annotations
 import pygame
 
 from gui.render import Render
-from gui.theme import THEMES
+from frontend.gui.theme import THEMES
 
 
 def draw_move_list(

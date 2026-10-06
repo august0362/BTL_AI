@@ -8,7 +8,7 @@ import pygame
 
 from gui.render import Render
 from gui.screens.base import Screen
-from gui.theme import THEMES, Theme
+from frontend.gui.theme import THEMES, Theme
 from gui.widgets.button import Button
 
 if TYPE_CHECKING:

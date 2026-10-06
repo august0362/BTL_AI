@@ -70,11 +70,11 @@ class App:
         Render.font.cache_clear()
         render_module.FONT_SCALE = self.render_scale
         ui = self.config.setdefault("ui", {})
-        theme_id = ui.get("theme", "dark_winter")
+        theme_id = ui.get("theme", "dark_winter") # base theme is dark winter
         self.theme = get_theme(theme_id if theme_id in THEME_IDS else "dark_winter")
         ui["theme"] = self.theme.id
         self.clock = pygame.time.Clock()
-        self.fps = window.get("fps", 60)
+        self.fps = window.get("fps", 120)
         self._controller: GameController | None = None
         self._current_screen_name = "menu"
         self.screen = MenuScreen(self)

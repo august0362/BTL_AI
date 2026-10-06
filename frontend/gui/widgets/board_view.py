@@ -8,7 +8,7 @@ import pygame
 from gui import board_geometry
 from gui.assets_loader import piece_image
 from gui.render import Render
-from gui.theme import Theme
+from frontend.gui.theme import Theme
 from gui.widgets.promotion_dialog import PromotionDialog
 
 

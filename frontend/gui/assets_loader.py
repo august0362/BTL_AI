@@ -29,7 +29,7 @@ def get_font(size: int, *, bold: bool = False) -> pygame.font.Font:
             return pygame.font.Font(path, size)
     return pygame.font.Font(None, size)
 
-
+#fit word to a given width, scaling down if necessary
 def render_fit(
     font: pygame.font.Font,
     text: str,
