@@ -25,7 +25,7 @@ class Button:
 
     def draw(self, canvas: Render, font: pygame.font.Font | int, theme=None) -> None:
         """Draw the button and its centered label."""
-        from frontend.gui.theme import THEMES
+        from gui.theme import THEMES
 
         roles = (theme or self.current_theme or THEMES["dark_winter"]).roles
         color = roles["text_disabled"] if not self.enabled else roles[self.style]

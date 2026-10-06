@@ -19,7 +19,7 @@ elo_k = 32
 max_games = 20
 
 [ui]
-language = "en"            # "vi" | "en"
+language = "vi"            # "vi" | "en"
 sound_enabled = false
 piece_set = "rhosgfx"
 theme = "dark_winter"       # id theme (CONTEXT §5.12, §5.13); màu bàn cờ lấy theo theme

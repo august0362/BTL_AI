@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import chess
 import pygame
-from frontend.gui.theme import THEMES, Theme
 
 from gui.assets_loader import piece_image
 from gui.i18n import Translator
 from gui.render import Render
+from gui.theme import THEMES, Theme
 
 
 class PromotionDialog:
