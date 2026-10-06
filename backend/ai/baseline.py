@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import chess
+
 from ai.base_bot import BaseBot
 
 # Bảng giá trị cơ bản của các quân cờ (Material values)

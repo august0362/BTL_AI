@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pygame
+from frontend.gui.theme import THEMES, Theme
 
 from gui.render import Render
 from gui.screens.base import Screen
-from frontend.gui.theme import THEMES, Theme
 from gui.widgets.button import Button
 
 if TYPE_CHECKING:
