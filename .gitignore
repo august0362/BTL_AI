@@ -57,6 +57,7 @@ desktop.ini
 
 # Linux run script & venv
 run.sh
+test.sh
 .venv/
 
 DEEP_RL_DESIGN.md

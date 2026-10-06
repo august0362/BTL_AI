@@ -1,4 +1,6 @@
-"""Accessible semantic themes derived from the project's color palettes."""
+"""Accessible semantic themes derived from the project's color palettes.
+Redesigned with a modern, harmonious, and aesthetic 'Canva-style' UI/UX approach.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +11,9 @@ from pathlib import Path
 
 THEME_DIR = Path(__file__).resolve().parents[1] / "resource" / "theme"
 _HEX_PALETTE = re.compile(r"^Color Hunt Palette ([0-9a-fA-F]{24})\.png$")
-_PIECE_OUTLINE = "#1A1A1A"
-_NEAR_WHITE = "#F7F6F1"
-_NEAR_BLACK = "#19232B"
+_PIECE_OUTLINE = "#1C1B1A"  # Softer off-black for pieces
+_NEAR_WHITE = "#FAF9F6"  # Warmer, aesthetic off-white
+_NEAR_BLACK = "#2A2826"  # Softer, elegant dark charcoal
 
 
 @dataclass(frozen=True)
@@ -30,22 +32,32 @@ class Theme:
         return relative_luminance(self.roles["bg"]) < 0.18
 
 
+# Redesigned palettes based on modern, aesthetic Canva product templates
+# Ordered strictly from Darkest to Lightest for harmonious algorithmic generation
 PALETTES: dict[str, tuple[str, str, str, str]] = {
-    "dark_winter": ("#092328", "#12544F", "#2A835F", "#8BBB92"),
-    "dark_cold": ("#091540", "#1B2CC1", "#7692FF", "#ABD2FA"),
-    "cold": ("#E3F2FD", "#90CAF9", "#2196F3", "#0D47A1"),
-    "fall": ("#E2A16F", "#FFF0DD", "#D1D3D4", "#86B0BD"),
-    "summer": ("#FFEED6", "#A5AF79", "#827148", "#E8A07C"),
-    "winter": ("#777C6D", "#B7B89F", "#CBCBCB", "#EEEEEE"),
+    # Inspired by Matcha/Sage green product designs (Earthy, calming)
+    "dark_winter": ("#1B291C", "#3C5740", "#98A88E", "#F3F6EB"),
+    # Inspired by Lavender/Purple midnight cosmetics (Mysterious, elegant)
+    "dark_cold": ("#2A1E35", "#513B6B", "#A895C2", "#F5F3F7"),
+    # Inspired by Clean minimalist UI / Sky blue (Fresh, airy)
+    "cold": ("#1E2A38", "#53708F", "#B2C5D8", "#F0F4F8"),
+    # Inspired by Mocha/Chocolate flyers (Warm, rich, appetizing)
+    "fall": ("#3E2211", "#7A4E35", "#D2B49E", "#FAF4F0"),
+    # Inspired by Blush pink/Skincare highlights (Soft, sweet, inviting)
+    "summer": ("#4A1C22", "#A65A68", "#E6ACB4", "#FDF5F5"),
+    # Inspired by Beige minimalist aesthetic/Tote bags (Neutral, sophisticated)
+    "winter": ("#242322", "#6B6661", "#C4BFBA", "#F5F3EF"),
 }
+
 NAMES: dict[str, tuple[str, str]] = {
-    "dark_winter": ("Rừng đêm", "Night Forest"),
-    "dark_cold": ("Biển đêm", "Deep Sea"),
-    "cold": ("Bầu trời", "Sky"),
-    "fall": ("Mùa thu", "Autumn"),
-    "summer": ("Mùa hè", "Summer"),
-    "winter": ("Mùa đông", "Winter"),
+    "dark_winter": ("Trà Xanh", "Matcha Latte"),
+    "dark_cold": ("Oải Hương", "Deep Lavender"),
+    "cold": ("Bầu Trời", "Aesthetic Sky"),
+    "fall": ("Cà Phê", "Mocha Chocolate"),
+    "summer": ("Mỹ Phẩm", "Blush Pink"),
+    "winter": ("Tối Giản", "Minimalist Beige"),
 }
+
 COLOR_HUNT_NAMES: dict[str, tuple[str, str]] = {
     "ch_3368a0": ("Biển sương", "Coastal Mist"),
     "ch_3e0f8d": ("Hoàng hôn tím", "Violet Dusk"),
@@ -107,6 +119,15 @@ def darken(color: str, amount: float) -> str:
         raise ValueError("amount must be between 0 and 1")
     _, lightness, _ = _hls(color)
     return _with_lightness(color, lightness * (1 - amount))
+
+
+def _desaturate(color: str, amount: float) -> str:
+    """Reduce color saturation for a more muted, premium aesthetic."""
+    if not 0 <= amount <= 1:
+        raise ValueError("amount must be between 0 and 1")
+    hue, lightness, saturation = _hls(color)
+    rgb = colorsys.hls_to_rgb(hue, lightness, max(0.0, saturation * (1 - amount)))
+    return _hex(tuple(round(channel * 255) for channel in rgb))
 
 
 def relative_luminance(color: str) -> float:
@@ -205,7 +226,8 @@ def _tone_for_board_contrast(color: str, other: str) -> str:
 def _muted_board_tones(light: str, dark: str) -> tuple[str, str]:
     """Clamp board colors while retaining their hues and required contrast."""
     sources = (_hls(light), _hls(dark))
-    limits = ((0.785, 0.935, 0.34), (0.385, 0.615, 0.44))  # chừa sai số làm tròn hex
+    # Adjusted limits for a softer, more pastel/matte board aesthetic
+    limits = ((0.75, 0.95, 0.28), (0.42, 0.65, 0.35))
     options = []
     for (hue, old_lightness, old_saturation), (low, high, max_saturation) in zip(
         sources, limits, strict=True
@@ -247,10 +269,11 @@ def _visible_on_board(color: str, squares: tuple[str, str]) -> str:
 
 
 def _signal_color(background: str, *, danger: bool) -> str:
+    # Tuned to softer, aesthetic Canva-style semantic colors (Corals and Warm Golds)
     candidates = (
-        ("#FF7972", "#E34B48", "#B3261E", "#8E2424")
+        ("#E27A77", "#D15C59", "#B33E3C", "#8C2624")  # Soft, dusty coral reds
         if danger
-        else ("#FFD166", "#F2B134", "#9A5D00", "#765000")
+        else ("#EAD29C", "#D9B86A", "#B39147", "#8C6E2E")  # Creamy mustard / muted gold
     )
     valid = []
     for source in candidates:
@@ -280,26 +303,38 @@ def derive_theme(
 
     if dark:
         background = darkest
-        surface = lighten(background, 0.08)
-        middle_tone = ordered[2]
+        # Much softer elevation for a modern UI look
+        surface = lighten(background, 0.035)
     else:
         background = lightest
-        surface = darken(background, 0.035)
-        middle_tone = ordered[1]
-    if surface == background:
-        surface = _mix(background, lightest if dark else darkest, 0.06)
-    surface_alt = _mix(surface, middle_tone, 0.16)
-    border = _mix(middle_tone, background, 0.26)
+        # Very subtle off-white elevation
+        surface = darken(background, 0.02)
 
-    middle_colors = ordered[1:3]
+    if surface == background:
+        surface = _mix(background, lightest if dark else darkest, 0.04)
+
+    # --- AESTHETIC HARMONY WASH (UPDATED FOR REFLECTANCE) ---
+    middle_colors = [
+        lighten(_mix(_desaturate(color, 0.15), background, 0.12), 0.08)
+        if dark
+        else darken(_mix(_desaturate(color, 0.15), background, 0.12), 0.05)
+        for color in ordered[1:3]
+    ]
+
+    surface_alt = _mix(surface, middle_colors[-1] if dark else middle_colors[0], 0.20)
+    border = _mix(surface, lightest if dark else darkest, 0.25)
+
     primary_source = max(
         middle_colors, key=lambda color: colorsys.rgb_to_hls(*(v / 255 for v in _rgb(color)))[2]
     )
     secondary_source = next(color for color in middle_colors if color != primary_source)
     primary, on_primary = _accessible_fill(primary_source)
     secondary, on_secondary = _accessible_fill(secondary_source)
-    primary_hover, on_primary_hover = _accessible_fill(lighten(primary, 0.12))
-    secondary_hover, on_secondary_hover = _accessible_fill(lighten(secondary, 0.12))
+
+    # Modern hover states: Bật sáng mạnh hơn (18%) để tạo hiệu ứng phát sáng (Glow) khi tương tác
+    primary_hover, on_primary_hover = _accessible_fill(lighten(primary, 0.18))
+    secondary_hover, on_secondary_hover = _accessible_fill(lighten(secondary, 0.18))
+
     accent_sources = (
         [lightest, darkest, primary_source] if dark else [darkest, lightest, primary_source]
     )
@@ -310,12 +345,13 @@ def derive_theme(
             accent, on_accent = candidate, foreground
             break
 
+    # Harmonized text colors that feel integrated into the theme
     text_source = lightest if dark else darkest
-    text_target = _with_lightness(text_source, 0.94 if dark else 0.10)
+    text_target = _with_lightness(text_source, 0.95 if dark else 0.12)
     text = _accessible_text(text_target, (background, surface), 4.5)
     muted_source = ordered[2] if dark else ordered[1]
-    text_muted = _accessible_text(muted_source, (background,), 3)
-    text_disabled = _mix(text_muted, background, 0.46)
+    text_muted = _accessible_text(muted_source, (background,), 3.5)
+    text_disabled = _mix(text_muted, background, 0.5)
 
     board_dark = _tone_for_minimum_luminance(darkest, 0.14)
     board_light = _tone_for_minimum_luminance(lightest, 0.54)
@@ -350,7 +386,7 @@ def derive_theme(
         "board_dark": board_dark,
         "board_select": _visible_on_board(primary, board_squares),
         "board_last": _visible_on_board(_signal_color(background, danger=False), board_squares),
-        "board_hint": _visible_on_board(darken(board_dark, 0.28), board_squares),
+        "board_hint": _visible_on_board(darken(board_dark, 0.20), board_squares),
     }
     roles["on_danger"] = _foreground(roles["danger"])
     fallback_name = f"Color Hunt #{theme_id.removeprefix('ch_')}"
@@ -364,34 +400,37 @@ def derive_theme(
 
 
 def _handpicked_dark_winter() -> Theme:
-    """Build the original forest palette while retaining its curated visual balance."""
+    """Build the new Matcha (dark_winter) palette with curated Canva-style visual balance."""
+    # Updated to the beautiful earthy matcha tone from the palette
     colors = PALETTES["dark_winter"]
     roles = {
-        "bg": "#092328",
-        "surface": "#0E3236",
-        "surface_alt": "#12423F",
-        "border": "#1E5F57",
-        "text": "#EAF4EC",
-        "text_muted": "#8BBB92",
-        "text_disabled": "#668078",
-        "primary": "#2A835F",
-        "primary_hover": "#369C74",
-        "on_primary_hover": "#19232B",
+        "bg": "#1B291C",  # Deep rich forest black-green
+        "surface": "#243625",  # Smooth elevated leaf tone
+        "surface_alt": "#2E4530",  # Subtle tertiary background
+        "border": "#3C5740",  # Soft integrated border
+        "text": "#F3F6EB",  # Creamy matcha milk text
+        "text_muted": "#98A88E",  # Sage green muted text
+        "text_disabled": "#5A6D56",  # Deep olive disabled text
+        "primary": "#4C6B45",  # Bold leaf green
+        "primary_hover": "#5A7D52",  # Lighter pop for hover
+        "on_primary_hover": "#F3F6EB",
         "on_primary": "#FFFFFF",
-        "secondary": "#12544F",
-        "secondary_hover": "#1B6D63",
-        "on_secondary_hover": "#EAF4EC",
-        "on_secondary": "#EAF4EC",
-        "accent": "#8BBB92",
-        "on_accent": "#111111",
-        "attention": "#E9B949",
-        "danger": "#D9534F",
-        "board_light": "#DDEBDD",
-        "board_dark": "#5F9C7C",
-        "board_select": "#46B49A",
-        "board_last": "#E9B949",
-        "board_hint": "#26383B",
+        "secondary": "#3C5740",
+        "secondary_hover": "#49694E",
+        "on_secondary_hover": "#F3F6EB",
+        "on_secondary": "#F3F6EB",
+        "accent": "#98A88E",  # Soft sage accent
+        "on_accent": "#141D14",
+        "attention": "#D6A85B",  # Warm earthy gold
+        "danger": "#D16A65",  # Soft coral red
+        "board_light": "#E9EFE4",  # Soft pastel matcha paper
+        "board_dark": "#7B9675",  # Earthy green board tone
+        "board_select": "#66A374",
+        "board_last": "#D6A85B",
+        "board_hint": "#2A402D",
     }
+
+    # Ensuring algorithm safety and accessibility remains intact
     roles["board_light"], roles["board_dark"] = _muted_board_tones(
         roles["board_light"], roles["board_dark"]
     )
