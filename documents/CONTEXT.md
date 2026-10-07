@@ -140,12 +140,21 @@ BOT_REGISTRY: dict[str, str] = {
     "deep_rl":              "ai.deep_rl.bot:DeepRLBot",
 }
 DEBUG_BOTS: dict[str, str] = {"random": "ai.random_bot.bot:RandomBot"}
+BENCHMARK_BOTS: dict[str, str] = {
+    "bench_random":           "ai.benchmarks.bot:BenchmarkRandomBot",
+    "bench_alphabeta3":       "ai.benchmarks.bot:BenchmarkAlphaBetaBot",
+    "bench_alphabeta_tt":     "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
+    "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",
+}
 
-def list_bots(include_debug: bool = False) -> list[str]: ...
+def list_bots(include_debug: bool = False, include_baseline: bool = False,
+              include_benchmarks: bool = False) -> list[str]: ...
 def create_bot(bot_id: str, config: dict | None = None) -> BaseBot: ...  # importlib, raise BotUnavailableError
 ```
 
 Mỗi bot đặt lớp chính ở `backend/ai/<bot>/bot.py`.
+
+**Bot benchmark (quyết định 2026-10-07):** `BENCHMARK_BOTS` là danh sách **opt-in**, chỉ hiện khi gọi `list_bots(include_benchmarks=True)`. Màn Người vs Bot, Lịch sử và Xếp hạng Elo dùng mặc định nên không thấy 4 bot này; giải **Xếp hạng AI** (§4.9) nạp đủ 8 bot. `create_bot` nhận cả 4 khóa benchmark.
 
 **Baseline ngẫu nhiên (quyết định 2026-10-04):** bot nào chưa có code thật thì tạm **đi nước hợp lệ ngẫu nhiên**, để GUI và giải đấu luôn chơi được đủ 4 bot.
 - Lớp dùng chung `backend/ai/baseline.py::RandomBaselineBot(BaseBot)`. Thuộc tính `is_baseline = True`, có `random.Random(config.get("seed"))` riêng. Đặt ở `backend/ai/` (không phải package bot), nên các bot được phép import.
@@ -391,6 +400,106 @@ class History:
 - Mỗi **ván đơn lẻ** là một mục. Ván trong Best of 3 có `series_id` và `series_game_index` để GUI ghi chú "Ván 2/3".
 - Ván bị hủy **vẫn lưu** (để xem lại) nhưng không tính xếp hạng.
 
+### 4.9 Bảng xếp hạng AI — giải vòng tròn (`backend/ai/benchmarks/`, `backend/tournament/`)
+
+Thang **bot benchmark** cho việc phân loại sức mạnh, tách khỏi xếp hạng Elo (§4.7). Bốn bot nằm trong package `backend/ai/benchmarks/` (đăng ký opt-in ở §4.2):
+
+| id | Tên | Cách chơi |
+|---|---|---|
+| `bench_random` | Benchmark 1 · Random | Chọn đều ngẫu nhiên trong các nước hợp lệ (có `seed`) |
+| `bench_alphabeta3` | Benchmark 2 · Alpha-Beta 3 | Negamax alpha-beta, độ sâu cố định (mặc định 3), eval `ai.baseline.evaluate` |
+| `bench_alphabeta_tt` | Benchmark 3 · Alpha-Beta TT | Thêm bảng chuyển vị (Zobrist) và sắp xếp nước đi (MVV-LVA, phong cấp, killer) |
+| `bench_alphabeta_custom` | Benchmark 4 · Alpha-Beta Custom | Như Benchmark 3 với eval mô-đun chọn được (`evaluator`) |
+
+```python
+# backend/ai/benchmarks/evaluation.py   (eval trả điểm theo bên đang đi, dùng cho negamax)
+def material_evaluator(board) -> float: ...     # bọc ai.baseline.evaluate
+def positional_evaluator(board) -> float: ...   # thêm kiểm soát trung tâm + phát triển quân
+def register_evaluator(name: str, evaluator) -> None: ...   # mở rộng cho Benchmark 4
+def build_evaluator(name: str = "positional") -> Callable: ...   # tên lạ -> ValueError
+
+# backend/ai/benchmarks/search.py
+class SearchResult(NamedTuple):
+    move: chess.Move | None; score: float; nodes: int; depth: int = 0
+class SearchTimeout(Exception): ...            # nội bộ: hết ngân sách thời gian giữa chừng
+class TranspositionTable:                       # khóa Zobrist, cờ EXACT/LOWERBOUND/UPPERBOUND
+    def clear(self) -> None: ...
+    def get(self, key: int) -> tuple[int, float, int, chess.Move | None] | None: ...
+    def store(self, key, depth, score, flag, move) -> None: ...
+def order_moves(board, *, tt_move=None, killer=None) -> list[chess.Move]: ...
+def alpha_beta(board, depth, evaluator) -> SearchResult: ...
+def alpha_beta_tt(board, depth, evaluator, *, tt=None, killers=None) -> SearchResult: ...
+    # alpha_beta_tt phải cho CÙNG điểm với alpha_beta trên mọi thế cờ
+def alpha_beta_iterative(board, max_depth, evaluator, *, tt=None, killers=None,
+                         time_limit_s=None) -> SearchResult: ...
+    # sâu dần 1..max_depth; hết `time_limit_s` (giây) thì bỏ kết quả dở và trả nước
+    # của tầng sâu nhất đã tính xong. time_limit_s=None/<=0 -> tính đủ max_depth.
+```
+
+`bench_alphabeta_tt` / `bench_alphabeta_custom` giữ bảng chuyển vị và killer **trong một ván**; `reset()` (gọi đầu mỗi ván) xóa cả hai.
+Ba bot tìm kiếm dùng `alpha_beta_iterative` với `config["max_think_time_s"]` (không có/<=0 = không giới hạn) nên **không bao giờ vượt trần thời gian mỗi nước**.
+
+```python
+# backend/tournament/tournament_config.py
+@dataclass(frozen=True)
+class TournamentConfig:
+    bots: tuple[str, ...]
+    matches_per_pair: int = 20     # mỗi cặp đấu bấy nhiêu ván, chia đều Trắng/Đen
+    max_history: int = 10          # số "Trận Chiến Lần n" giữ lại (FIFO)
+    max_plies: int = 150           # quá số nửa nước -> hòa (không vờn nhau vô tận)
+    depth: int = 0                 # > 0: ép độ sâu mọi bot; 0: giữ cấu hình riêng của bot
+    max_think_time_s: float = 1.0  # trần thời gian suy nghĩ mỗi nước (giây); 0 = không giới hạn
+    random_opening_plies: int = 2
+    claim_draw: bool = True
+    seed: int = -1                 # -1 = ngẫu nhiên; >= 0 để tái lập
+    @classmethod
+    def from_config(cls, config: dict) -> "TournamentConfig": ...   # đọc bảng [tournament], kẹp giá trị hợp lệ
+    def validate(self) -> None: ...                                  # raise ValueError nếu không hợp lệ
+
+# backend/tournament/round_robin.py
+@dataclass
+class Matchup:                    # tổng đối đầu một cặp: games, wins_a/b, draws, score_a/b
+    def add(self, winner: chess.Color | None, a_is_white: bool) -> None: ...
+@dataclass(frozen=True)
+class StandingRow:                # bot_id, rank, points, games, wins, draws, losses, think_time_s, score_pct
+@dataclass
+class TournamentResult:           # participants, matches_per_pair, completed, standings, matchups, battle, errors
+    def to_json(self) -> dict: ...        # version 1
+    @classmethod
+    def from_json(cls, data: dict) -> "TournamentResult": ...
+def compute_standings(participants, matchups, think_times=None) -> tuple[StandingRow, ...]: ...
+
+class RoundRobinRunner:
+    def __init__(self, participant_ids, *, matches_per_pair=20, max_plies=150, claim_draw=True,
+                 random_opening_plies=2, depth=None, max_think_time_s=None, eval_scale=8.0,
+                 bot_configs=None, seed=None, on_progress=None, on_ply=None, on_game_end=None,
+                 clock=time.perf_counter, create_bot=None): ...
+    pairs: tuple[tuple[str, str], ...]     # mọi cặp KHÔNG thứ tự
+    games_total: int                        # len(pairs) * matches_per_pair
+    def play(self) -> TournamentResult: ...  # đồng bộ; GUI chạy trong luồng nền
+    def request_stop(self) -> None: ...      # dừng sau ván hiện tại, ván dở bị hủy và không tính điểm
+    def standings(self) -> tuple[StandingRow, ...]: ...   # bảng sống trong lúc đấu
+    # on_ply(ply) được gọi sau mỗi nửa nước -> GUI hiển thị tiến trình ngay trong ván
+
+# backend/tournament/tournament_history.py
+class TournamentHistory:
+    def __init__(self, directory: Path, max_runs: int = 10): ...   # tự tạo thư mục
+    def next_index(self) -> int: ...          # tiếp tục sau khi đã cắt bớt
+    def save(self, result: TournamentResult) -> TournamentResult: ...   # đóng dấu battle, ghi <dir>/battle_NNNN.json, cắt FIFO
+    def list(self) -> list[TournamentResult]: ...   # mới nhất trước, bỏ qua file hỏng
+    def load(self, battle: int) -> TournamentResult: ...
+    def clear(self) -> None: ...
+```
+
+- **Thể thức:** vòng tròn một lượt mọi cặp (`itertools.combinations`). Mỗi cặp đấu `matches_per_pair` ván, màu chia đều: nửa số ván bot A cầm Trắng, nửa cầm Đen (lẻ thì lệch tối đa 1 ván).
+- **Bot mới mỗi ván:** `RoundRobinRunner` gọi `create_bot(bot_id, config)` cho **từng ván** (không tái dùng instance). Mặc định `create_bot` là `ai.registry.create_bot` (nạp lười, đúng ranh giới §3.1).
+- **Giới hạn:** mỗi bot giữ độ sâu riêng (`[bots.<id>]` hoặc mặc định của bot); `tournament.depth > 0` mới **ép** mọi bot cùng độ sâu. Ván dừng khi hết `max_plies` hoặc theo luật hòa (`claim_draw`) và xử hòa.
+- **Trần thời gian:** `tournament.max_think_time_s` được truyền cho mọi bot. Bot benchmark tự dừng đúng hạn (iterative deepening); bot của thành viên chỉ bị giới hạn nếu code của họ đọc khóa này — hệ thống **không** ngắt ngang tiến trình đang tính (OI-1, OI-2).
+- **Điểm:** thắng 1, hòa 0,5, thua 0.
+- **Xếp hạng:** điểm giảm dần; **bằng điểm thì tổng thời gian suy nghĩ ít hơn xếp trên**. Hạng theo kiểu thi đấu tiêu chuẩn "1224": bằng cả điểm lẫn thời gian thì **chia sẻ hạng** (1, 2, 3, 4, 5, 5, 7).
+- **Lịch sử:** mỗi lần chạy xong lưu thành `battle_NNNN.json` (tiêu đề "Trận Chiến Lần n"), giữ tối đa `max_history` bản gần nhất. Kết quả giải **tách riêng** ở `database/data/tournaments/`, không ghi vào `history/` hay `ranking.json`.
+- **Lỗi bot:** một bot hỏng chỉ bị ghi vào `TournamentResult.errors` và bỏ ván đó, không làm sập giải.
+
 ## 5. Đặc tả GUI (Pygame)
 
 ### 5.1 Cửa sổ
@@ -402,7 +511,7 @@ class History:
 
 | Màn hình | Nội dung |
 |---|---|
-| Menu chính | Người vs Bot · Bot vs Bot · Lịch sử · Xếp hạng · Cài đặt · Thoát |
+| Menu chính | Người vs Bot · Bot vs Bot · **Xếp hạng AI** · Lịch sử · Xếp hạng · Cài đặt · Thoát |
 | Chuẩn bị (Người vs Bot) | Chọn 1 trong 4 bot, chọn màu Trắng/Đen/**Ngẫu nhiên**, đổi phe tự do. Bấm Bắt đầu |
 | Chuẩn bị (Bot vs Bot) | Chọn bot Trắng và bot Đen độc lập (được trùng nhau), nút hoán đổi, chọn 1 ván / Best of 3 |
 | Ván đấu | Bàn cờ + panel. **Không Undo, không đổi phe.** Có nút Dừng ván và icon loa |
@@ -410,6 +519,8 @@ class History:
 | Lịch sử | Danh sách 20 ván. Mở ra là màn Xem lại |
 | Xem lại | Play/Pause, tốc độ, ◀ ▶ từng nước, về đầu/cuối, xuất PGN |
 | Xếp hạng | Bảng W/D/L, điểm, Elo. Nút Reset |
+| Xếp hạng AI | Bảng xếp hạng 8 bot benchmark + thành viên; nút **Bắt đầu đấu** (đổi thành **Dừng đấu** khi chạy), **Lịch sử**, **Quay lại** nằm **dưới bảng** |
+| Lịch sử giải đấu | Danh sách 10 "Trận Chiến Lần n" + bảng xếp hạng và tỉ số đối đầu từng cặp. Màn riêng |
 | Cài đặt | Ngôn ngữ (vi/en), âm thanh bật/tắt, độ trễ xem lại mặc định |
 
 Bot nào raise `BotUnavailableError` thì hiện mờ trong danh sách chọn, kèm lý do.
@@ -767,6 +878,47 @@ Ngoài 6 theme ở §5.12, thêm **18 theme** tạo **tự động** từ file `
 - Cuộn được (con lăn + nút ▲/▼ vẽ bằng hình).
 - Ô đang dùng có viền `accent`. Rê chuột lên một ô thì **xem trước** màu ngay trên màn Cài đặt; bấm mới lưu.
 
+### 5.14 Xếp hạng AI — màn + bộ điều khiển (`frontend/gui/tournament_view.py`, `tournament_controller.py`, `screens/tournament.py`, `screens/tournament_history.py`, `widgets/progress_bar.py`)
+
+`tournament_view.py` **không import pygame** (test được trên CI):
+
+```python
+def tournament_rows(standings, translator) -> list[TournamentRow]: ...   # dịch tên bot, giữ hạng
+def provisional_standings(bot_ids) -> tuple[StandingRow, ...]: ...
+    # bảng 0 điểm, hạng 1..n theo thứ tự config — hiện sẵn khi chưa đấu ván nào
+def format_points(points) -> str: ...            # "g" — bỏ ".0"
+def format_seconds(seconds) -> str: ...          # "<s:.1f>s"
+def format_head_to_head(matchup) -> str: ...     # "15 - 5"
+def format_matchup(matchup, translator) -> str: ...   # "MCTS  15 - 5  Deep RL"
+def progress_fraction(done, total) -> float: ...      # kẹp 0..1
+```
+
+```python
+# frontend/gui/tournament_controller.py   — chạy nền, KHÔNG import pygame
+@dataclass(frozen=True)
+class TournamentSnapshot:
+    running: bool; finished: bool; stopped: bool
+    games_done: int; games_total: int
+    current_pair: tuple[str, str] | None
+    standings: tuple[StandingRow, ...]
+    result: TournamentResult | None
+    error: str | None
+    progress: float                          # property, games_done / games_total
+
+class TournamentController:
+    def __init__(self, config: dict, *, settings: TournamentConfig | None = None,
+                 history: TournamentHistory | None = None, create_bot=None): ...
+    def start(self) -> None: ...       # chạy RoundRobinRunner trong threading.Thread; gọi 2 lần -> RuntimeError
+    def stop(self) -> None: ...        # cờ dừng + runner.request_stop()
+    def join(self, timeout=None) -> bool: ...
+    def snapshot(self) -> TournamentSnapshot: ...   # an toàn luồng; bảng sống lấy từ runner
+```
+
+- **Màn "Xếp hạng AI":** vẽ sẵn bảng điểm (khi chưa có dữ liệu thì dùng `provisional_standings`; nếu đã có trận gần nhất thì dùng bảng đó). Trong lúc chạy hiện dòng trạng thái (`tournament.running`), **thanh tiến trình tổng** (`snapshot.progress`) và cặp đang đấu. **Hai nút nằm dưới bảng**: `tournament.start` (đổi nhãn/th style sang `tournament.stop` + `danger` khi đang chạy) và `tournament.history`.
+- **Màn "Lịch sử giải đấu":** danh sách tối đa 10 "Trận Chiến Lần n" (nút chọn), bảng xếp hạng của trận đang xem và danh sách tỉ số đối đầu (`format_matchup`), cuộn bằng ▲/▼.
+- **Không chặn UI:** mọi tính toán trong luồng nền; màn hình chỉ đọc `snapshot()` mỗi frame. `App.quit()` và nút **Dừng đấu** đều gọi `TournamentController.stop()`.
+- Bảng 8 dòng (đủ 8 bot mặc định); motif mới chỉ dùng vai trò màu của theme (§5.12).
+
 ## 6. Cấu hình
 
 - `backend/config/default.toml` được commit. `backend/config/local.toml` nằm trong .gitignore và ghi đè từng khóa (deep merge).
@@ -818,6 +970,33 @@ scale = 8.0
 weights_url = ""           # link asset trên GitHub Release
 weights_sha256 = ""
 device = "cpu"
+
+[tournament]               # bảng xếp hạng AI (§4.9)
+bots = [                   # bot tham gia; mặc định 4 thành viên + 4 benchmark
+    "alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl",
+    "bench_random", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom",
+]
+matches_per_pair = 20      # số ván mỗi cặp; chia đều Trắng/Đen
+max_history = 10           # số "Trận Chiến Lần n" giữ lại gần nhất
+max_plies = 150            # quá số nửa nước -> hòa
+max_think_time_s = 1.0     # trần thời gian suy nghĩ mỗi nước (giây); 0 = không giới hạn
+depth = 0                  # > 0: ép mọi bot cùng độ sâu; 0: giữ độ sâu riêng của từng bot
+random_opening_plies = 2
+claim_draw = true
+seed = -1                  # -1 = ngẫu nhiên mỗi lần chạy; >= 0 để tái lập
+
+[bots.bench_random]
+seed = -1
+
+[bots.bench_alphabeta3]
+depth = 3
+
+[bots.bench_alphabeta_tt]
+depth = 3
+
+[bots.bench_alphabeta_custom]
+depth = 3
+evaluator = "positional"   # tên trong ai.benchmarks.evaluation
 
 # Các bot khác tự thêm [bots.<bot_id>]. Nội dung bảng này được truyền vào BaseBot(config=...)
 ```
@@ -902,9 +1081,10 @@ Code bên trong từng bot không bị bắt buộc coverage, chỉ bắt buộc
 
 | ID | Vấn đề | Trạng thái |
 |---|---|---|
-| OI-1 | Giới hạn thời gian / độ sâu mỗi nước | Hoãn. Hiện không giới hạn, chỉ đo và hiển thị. Xem xét lại nếu ván quá chậm |
+| OI-1 | Giới hạn thời gian / độ sâu mỗi nước | Hoãn với ván thường. Giải xếp hạng AI đã có `tournament.max_think_time_s` (bot benchmark tự dừng đúng hạn) + `max_plies`; bot thành viên không đọc khóa này thì vẫn chỉ đo, không ngắt |
 | OI-2 | Dừng cứng bot đang suy nghĩ (chạy bot trong tiến trình riêng) | Hoãn. Hiện "Dừng ván" có hiệu lực sau nước hiện tại |
 | OI-3 | Chi tiết giải round-robin cá nhân (`another/local_tools/`) | Đã có bản cơ bản `another/local_tools/arena.py` (2026-10-04). Chỉ trên máy `@august0362`, không push |
 | OI-4 | Username GitHub thành viên Option 3 | Chờ. Cập nhật mục 2 và CODEOWNERS |
 | OI-5 | Giá trị `max_plies`, số nước khai cuộc ngẫu nhiên tối ưu | Tạm dùng 300 và 2. Chỉnh trong config khi có số liệu |
 | OI-6 | Thanh đánh giá dùng đánh giá riêng của bot | Hoãn. Hiện dùng chênh lệch quân |
+| OI-7 | Bảng Xếp hạng AI hiển thị tối đa 8 dòng (đủ 8 bot mặc định) | Chấp nhận. Thêm bot thì cần cuộn bảng; `tournament.bots` vẫn là nguồn dữ liệu |

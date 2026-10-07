@@ -5,6 +5,20 @@
 
 ## [Unreleased]
 
+### Added
+- **Bot benchmark** (`backend/ai/benchmarks/`) làm thang phân loại sức mạnh: `bench_random` (ngẫu nhiên đều), `bench_alphabeta3` (alpha-beta sâu 3, eval `ai.baseline`), `bench_alphabeta_tt` (thêm bảng chuyển vị Zobrist + sắp nước MVV-LVA/killer), `bench_alphabeta_custom` (eval mô-đun chọn được qua `evaluator`).
+- **Giải vòng tròn xếp hạng AI**: `backend/tournament/round_robin.py` (mọi cặp, chia đều Trắng/Đen, 20 ván mỗi cặp, điểm 1/0.5/0, hạng "1224", phá hòa bằng tổng thời gian suy nghĩ, dừng giữa chừng an toàn, bot mới mỗi ván), `tournament_config.py` (đọc bảng `[tournament]`), `tournament_history.py` (lưu "Trận Chiến Lần n", giữ 10 bản gần nhất — tách khỏi Elo/ván thường).
+- **GUI**: mục **Xếp hạng AI** trong Board Menu (dưới "Bot vs Bot", trên "Lịch sử") với `frontend/gui/screens/tournament.py`, `screens/tournament_history.py`, `tournament_controller.py` (luồng nền + nút Dừng đấu), `tournament_view.py`, `widgets/progress_bar.py`; bảng xếp hạng hiện sẵn khi chưa đấu, 2 nút nằm dưới bảng, thanh tiến trình tổng, màn lịch sử riêng kèm tỉ số đối đầu.
+- Config: bảng `[tournament]` và `[bots.bench_*]` trong `backend/config/default.toml`.
+- Giới hạn thời gian suy nghĩ mỗi nước: `[tournament] max_think_time_s` (mặc định 1.0s, 0 = không giới hạn); bot benchmark sâu dần (`alpha_beta_iterative`) và tự dừng đúng hạn, trả nước của tầng sâu nhất đã tính xong. `[tournament] depth = 0` mặc định **không ép** độ sâu để bot thành viên giữ cấu hình riêng (nhanh hơn nhiều).
+- Thanh tiến trình hiển thị cả nửa nước đang đi (`ván x/y · nước a/b`) qua callback `on_ply`.
+- Test: `another/tests/ai/test_benchmarks.py`, `another/tests/tournament/test_round_robin.py`, `test_tournament_history.py`, `another/tests/gui/test_tournament_view.py`, `test_tournament_smoke.py`.
+
+### Changed
+- `backend/ai/registry.py`: thêm `BENCHMARK_BOTS` (opt-in) và tham số `list_bots(include_benchmarks=...)`; mặc định không đổi.
+- `backend/ai/baseline.py`: tách hàm dùng chung `evaluate(board)`; `RandomBaselineBot` gọi lại hàm này (hành vi không đổi).
+- `pyproject.toml`: thêm `ai.benchmarks` vào contract "bot độc lập".
+
 ### Decided
 - Bot chưa có code thật chạy **baseline ngẫu nhiên** (`backend/ai/baseline.py`), hiển thị hậu tố "(baseline)"; thay cho `BotUnavailableError("not implemented")`.
 

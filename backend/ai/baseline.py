@@ -17,6 +17,23 @@ PIECE_VALUES: dict[chess.PieceType, int] = {
 }
 
 
+def evaluate(board: chess.Board) -> int:
+    """Đánh giá thế trận: dương ưu thế cho Trắng, âm ưu thế cho Đen."""
+    if board.is_checkmate():
+        # Nếu bên nào bị chiếu hết thì thua điểm cực lớn
+        return -99999 if board.turn == chess.WHITE else 99999
+    if board.is_stalemate() or board.is_insufficient_material():
+        return 0
+
+    score = 0
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece is not None:
+            value = PIECE_VALUES[piece.piece_type]
+            score += value if piece.color == chess.WHITE else -value
+    return score
+
+
 class RandomBaselineBot(BaseBot):
     """Select the best legal move using Alpha-Beta pruning."""
 
@@ -28,20 +45,8 @@ class RandomBaselineBot(BaseBot):
         self.depth: int = self.config.get("depth", 3)
 
     def _evaluate(self, board: chess.Board) -> int:
-        """Đánh giá thế trận: dương ưu thế cho Trắng, âm ưu thế cho Đen."""
-        if board.is_checkmate():
-            # Nếu bên nào bị chiếu hết thì thua điểm cực lớn
-            return -99999 if board.turn == chess.WHITE else 99999
-        if board.is_stalemate() or board.is_insufficient_material():
-            return 0
-
-        score = 0
-        for square in chess.SQUARES:
-            piece = board.piece_at(square)
-            if piece is not None:
-                val = PIECE_VALUES[piece.piece_type]
-                score += val if piece.color == chess.WHITE else -val
-        return score
+        """Backward-compatible wrapper around the module-level evaluation."""
+        return evaluate(board)
 
     def _alphabeta(
         self,
