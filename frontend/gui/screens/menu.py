@@ -23,13 +23,14 @@ class MenuScreen(Screen):
         labels = (
             "menu.human_vs_bot",
             "menu.bot_vs_bot",
+            "menu.ai_ranking",
             "menu.history",
             "menu.leaderboard",
             "menu.settings",
             "menu.quit",
         )
         self.buttons = [
-            Button(pygame.Rect(340, 235 + i * 52, 280, 42), app.translator.t(key))
+            Button(pygame.Rect(340, 226 + i * 48, 280, 42), app.translator.t(key))
             for i, key in enumerate(labels)
         ]
         self.buttons[0].style = "primary"
@@ -42,12 +43,14 @@ class MenuScreen(Screen):
                 elif index == 1:
                     self.app.goto("setup_bots")
                 elif index == 2:
-                    self.app.goto("history")
+                    self.app.goto("tournament")
                 elif index == 3:
-                    self.app.goto("leaderboard")
+                    self.app.goto("history")
                 elif index == 4:
-                    self.app.goto("settings")
+                    self.app.goto("leaderboard")
                 elif index == 5:
+                    self.app.goto("settings")
+                elif index == 6:
                     self.app.quit()
                 return
 

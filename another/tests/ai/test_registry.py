@@ -8,6 +8,7 @@ registry = require_module("ai.registry")
 base = require_module("ai.base_bot")
 
 OFFICIAL = ["alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl"]
+BENCHMARKS = ["bench_random", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom"]
 
 
 def test_official_bots_in_order():
@@ -21,8 +22,24 @@ def test_debug_bots_hidden_by_default():
     assert registry.list_bots(include_debug=True) == OFFICIAL + ["random"]
 
 
+def test_benchmark_bots_are_opt_in():
+    assert list(registry.BENCHMARK_BOTS) == BENCHMARKS
+    assert "bench_random" not in registry.list_bots(include_debug=True)
+    assert registry.list_bots(include_benchmarks=True) == OFFICIAL + BENCHMARKS
+    assert registry.list_bots(include_debug=True, include_benchmarks=True) == (
+        OFFICIAL + ["random"] + BENCHMARKS
+    )
+
+
+def test_create_benchmark_bot():
+    bot = registry.create_bot("bench_random", {"seed": 1})
+    assert isinstance(bot, base.BaseBot)
+    assert bot.bot_id == "bench_random"
+    assert bot.config == {"seed": 1}
+
+
 def test_paths_follow_convention():
-    all_bots = {**registry.BOT_REGISTRY, **registry.DEBUG_BOTS}
+    all_bots = {**registry.BOT_REGISTRY, **registry.DEBUG_BOTS, **registry.BENCHMARK_BOTS}
     for bot_id, path in all_bots.items():
         module, _, cls = path.partition(":")
         assert cls, f"{bot_id}: thiếu ':Class' trong {path!r}"
@@ -32,7 +49,7 @@ def test_paths_follow_convention():
 def test_every_bot_package_is_registered():
     # Tạo thư mục bot mới trong backend/ai/ mà quên đăng ký => CI đỏ.
     packages = {p.parent.name for p in (PROJECT_ROOT / "backend" / "ai").glob("*/__init__.py")}
-    all_bots = {**registry.BOT_REGISTRY, **registry.DEBUG_BOTS}
+    all_bots = {**registry.BOT_REGISTRY, **registry.DEBUG_BOTS, **registry.BENCHMARK_BOTS}
     registered = {path.split(".")[1] for path in all_bots.values()}
     assert packages == registered
 

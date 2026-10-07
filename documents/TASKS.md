@@ -118,3 +118,16 @@ việc cần thiết đã được đánh dấu xong và merge vào `main`. M0 �
 - [ ] **C7-01** `C` Rà soát Open Issues, cập nhật CONTEXT/CHANGELOG
 - [x] **X7-01** `X` README hoàn chỉnh (DOC-1)
 - [ ] **U7-01** `U` Tag `v1.0.0` + Release
+
+## M8 — Bảng xếp hạng AI (yêu cầu 2026-10-07)
+
+> Đã code xong trên nhánh `server-vie`; các mục `[x]` chờ PR/merge để tính là hoàn tất.
+
+- [x] **BENCH-1** `X` Bốn bot benchmark trong `backend/ai/benchmarks/` (Random · Alpha-Beta 3 · Alpha-Beta TT · Alpha-Beta Custom) + đăng ký opt-in `BENCHMARK_BOTS`
+- [x] **TOUR-1** `X` `tournament_config.py` + bảng `[tournament]` trong `backend/config/default.toml` (20 ván/cặp, 10 lịch sử, `max_plies`, `depth`)
+- [x] **TOUR-1b** `X` Trần thời gian suy nghĩ mỗi nước `max_think_time_s` (mặc định 1.0s) + bot benchmark sâu dần tự dừng đúng hạn; `depth = 0` = không ép độ sâu (giữ cấu hình riêng của bot)
+- [x] **TOUR-2** `X` `round_robin.py`: vòng tròn mọi cặp, chia đều Trắng/Đen, điểm 1/0.5/0, hạng "1224", phá hòa bằng thời gian, bot mới mỗi ván, dừng giữa chừng
+- [x] **TOUR-3** `X` `tournament_history.py`: lưu "Trận Chiến Lần n" (`battle_NNNN.json`), giữ 10 bản gần nhất, tách khỏi Elo
+- [x] **GUI-T1** `X` Mục **Xếp hạng AI** trong Board Menu (dưới "Bot vs Bot", trên "Lịch sử") + màn lịch sử riêng, chạy nền, thanh tiến trình, nút Dừng đấu
+- [x] **T8-01** `X` Test: `test_benchmarks.py`, `test_round_robin.py`, `test_tournament_history.py`, `test_tournament_view.py`, `test_tournament_smoke.py`
+- [ ] **U8-01** `U` Chạy thử giải đầy đủ trên GUI, duyệt bố cục bảng/nút, báo lỗi

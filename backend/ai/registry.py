@@ -12,21 +12,38 @@ BOT_REGISTRY: dict[str, str] = {
 }
 DEBUG_BOTS: dict[str, str] = {"random": "ai.random_bot.bot:RandomBot"}
 BASELINE_BOTS: dict[str, str] = {"baseline": "ai.random_bot.bot:BaselineBot"}
+BENCHMARK_BOTS: dict[str, str] = {
+    "bench_random": "ai.benchmarks.bot:BenchmarkRandomBot",
+    "bench_alphabeta3": "ai.benchmarks.bot:BenchmarkAlphaBetaBot",
+    "bench_alphabeta_tt": "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
+    "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",
+}
 
 
-def list_bots(include_debug: bool = False, include_baseline: bool = False) -> list[str]:
+def list_bots(
+    include_debug: bool = False,
+    include_baseline: bool = False,
+    include_benchmarks: bool = False,
+) -> list[str]:
     """Return registered bot ids in display order."""
     bot_ids = list(BOT_REGISTRY)
     if include_debug:
         bot_ids.extend(DEBUG_BOTS)
     if include_baseline:
         bot_ids.extend(BASELINE_BOTS)
+    if include_benchmarks:
+        bot_ids.extend(BENCHMARK_BOTS)
     return bot_ids
 
 
 def create_bot(bot_id: str, config: dict | None = None) -> BaseBot:
     """Load and initialize a registered bot."""
-    bot_path = BOT_REGISTRY.get(bot_id) or DEBUG_BOTS.get(bot_id) or BASELINE_BOTS.get(bot_id)
+    bot_path = (
+        BOT_REGISTRY.get(bot_id)
+        or DEBUG_BOTS.get(bot_id)
+        or BASELINE_BOTS.get(bot_id)
+        or BENCHMARK_BOTS.get(bot_id)
+    )
     if bot_path is None:
         raise ValueError(f"Unknown bot id: {bot_id}")
 

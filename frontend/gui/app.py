@@ -24,11 +24,16 @@ from gui.screens.replay import ReplayScreen
 from gui.screens.settings import SettingsScreen
 from gui.screens.setup_bots import SetupBotsScreen
 from gui.screens.setup_human import SetupHumanScreen
+from gui.screens.tournament import TournamentScreen
+from gui.screens.tournament_history import TournamentHistoryScreen
 from gui.sound import SoundManager
 from gui.theme import THEME_IDS, get_theme
+from gui.tournament_controller import TournamentController
 from tournament.history import History
 from tournament.players import HumanPlayer
 from tournament.ranking import Ranking
+from tournament.tournament_config import TournamentConfig
+from tournament.tournament_history import TournamentHistory
 
 
 class App:
@@ -56,6 +61,13 @@ class App:
             known_ids=registry.list_bots(include_baseline=True) + ["human"],
         )
         self.history = History(self.data_dir / "history", history_cfg.get("max_games", 20))
+        self.tournament_settings = TournamentConfig.from_config(self.config)
+        self.tournament_history = TournamentHistory(
+            self.data_dir / "tournaments", self.tournament_settings.max_history
+        )
+        self.tournament = TournamentController(
+            self.config, settings=self.tournament_settings, history=self.tournament_history
+        )
         self._translator = Translator(self.config.get("ui", {}).get("language", "vi"))
         window = self.config.get("window", {})
         self.window_size = self._default_window_size(window)
@@ -169,6 +181,8 @@ class App:
             "history": HistoryScreen,
             "replay": ReplayScreen,
             "leaderboard": LeaderboardScreen,
+            "tournament": TournamentScreen,
+            "tournament_history": TournamentHistoryScreen,
             "settings": SettingsScreen,
             "game": GameScreen,
         }
@@ -245,6 +259,14 @@ class App:
         self.replay_model = ReplayModel(self.history.load(game_id))
         self.replay_model.delay_ms = self.config.get("ui", {}).get("replay_delay_ms", 800)
         self.goto("replay")
+
+    def start_tournament(self) -> None:
+        """Run the AI ranking round-robin in a background thread."""
+        self.tournament.start()
+
+    def stop_tournament(self) -> None:
+        """Ask the running AI ranking tournament to stop."""
+        self.tournament.stop()
 
     def _save_ui(self, key: str, value: Any) -> None:
         self.config.setdefault("ui", {})[key] = value
@@ -360,6 +382,7 @@ class App:
         """Stop any active game and shut down Pygame."""
         if self._controller is not None:
             self._controller.stop()
+        self.tournament.stop()
         self._running = False
         pygame.quit()
 

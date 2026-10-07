@@ -62,4 +62,5 @@ forbidden_modules = [
     "ai.genetic_alphabeta",
     "ai.mcts",
     "ai.deep_rl",
+    "ai.benchmarks",
 ]
