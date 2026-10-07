@@ -86,11 +86,11 @@ class _SearchBenchmarkBot(BaseBot):
         return result.move
 
 
-class BenchmarkAlphaBetaBot(_SearchBenchmarkBot):
-    """Benchmark 2: fixed-depth alpha-beta with the baseline evaluation."""
+class BenchmarkMaterialBot(_SearchBenchmarkBot):
+    """Benchmark 1.5: plain alpha-beta, score = own material minus the opponent's."""
 
-    bot_id = "bench_alphabeta3"
-    display_name = "Benchmark 2 - Alpha-Beta 3"
+    bot_id = "bench_alphabeta_material"
+    display_name = "Benchmark 1.5 - Alpha-Beta Material"
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
@@ -102,15 +102,35 @@ class BenchmarkAlphaBetaBot(_SearchBenchmarkBot):
         )
 
 
-class BenchmarkAlphaBetaTTBot(_SearchBenchmarkBot):
-    """Benchmark 3: alpha-beta with a transposition table and move ordering."""
+class BenchmarkAlphaBetaBot(_SearchBenchmarkBot):
+    """Benchmark 2: fixed-depth alpha-beta with material plus piece-square tables."""
 
-    bot_id = "bench_alphabeta_tt"
-    display_name = "Benchmark 3 - Alpha-Beta TT"
+    bot_id = "bench_alphabeta3"
+    display_name = "Benchmark 2 - Alpha-Beta 3"
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
-        self._evaluator = build_evaluator("material")
+        self.evaluator_name = str(self.config.get("evaluator", "pst"))
+        self._evaluator = build_evaluator(self.evaluator_name)
+        self._rng = random.Random(self.config.get("seed"))
+
+    def _search(self, board: chess.Board) -> SearchResult:
+        return alpha_beta_iterative(
+            board, self.depth, self._evaluator, time_limit_s=self.time_limit_s, rng=self._rng
+        )
+
+
+class BenchmarkAlphaBetaTTBot(_SearchBenchmarkBot):
+    """Benchmark 3: Benchmark 2 eval plus a transposition table, ordering and quiescence."""
+
+    bot_id = "bench_alphabeta_tt"
+    display_name = "Benchmark 3 - Alpha-Beta TT"
+    default_evaluator = "pst"
+
+    def __init__(self, config: dict | None = None) -> None:
+        super().__init__(config)
+        self.evaluator_name = str(self.config.get("evaluator", self.default_evaluator))
+        self._evaluator = build_evaluator(self.evaluator_name)
         self._tt = TranspositionTable()
         self._killers: dict[int, chess.Move] = {}
 
@@ -122,6 +142,7 @@ class BenchmarkAlphaBetaTTBot(_SearchBenchmarkBot):
             tt=self._tt,
             killers=self._killers,
             time_limit_s=self.time_limit_s,
+            quiescence=True,
         )
 
     def reset(self) -> None:
@@ -132,12 +153,21 @@ class BenchmarkAlphaBetaTTBot(_SearchBenchmarkBot):
 
 
 class BenchmarkAlphaBetaCustomBot(BenchmarkAlphaBetaTTBot):
-    """Benchmark 4: the TT bot with a configurable, modular evaluation."""
+    """Benchmark 4: Benchmark 3 + ``advanced`` eval, check extensions and (depth >= 4) pruning."""
 
     bot_id = "bench_alphabeta_custom"
     display_name = "Benchmark 4 - Alpha-Beta Custom"
+    default_evaluator = "advanced"
 
-    def __init__(self, config: dict | None = None) -> None:
-        super().__init__(config)
-        self.evaluator_name = str(self.config.get("evaluator", "positional"))
-        self._evaluator = build_evaluator(self.evaluator_name)
+    def _search(self, board: chess.Board) -> SearchResult:
+        return alpha_beta_iterative(
+            board,
+            self.depth,
+            self._evaluator,
+            tt=self._tt,
+            killers=self._killers,
+            time_limit_s=self.time_limit_s,
+            quiescence=True,
+            pruning=True,
+            extend_checks=True,
+        )

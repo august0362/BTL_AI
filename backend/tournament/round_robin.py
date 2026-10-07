@@ -84,6 +84,9 @@ class Matchup:
         )
 
 
+TIME_POINT_SECONDS = 100.0  # 100 s of thinking away from the average = 1 point
+
+
 @dataclass(frozen=True)
 class StandingRow:
     """One row of the final (or live) tournament table."""
@@ -97,6 +100,7 @@ class StandingRow:
     losses: int
     think_time_s: float
     score_pct: float
+    total: float = 0.0  # points + (average thinking time - own time) / 100
 
     def to_json(self) -> dict:
         """Return a JSON-compatible representation."""
@@ -110,6 +114,7 @@ class StandingRow:
             "losses": self.losses,
             "think_time_s": self.think_time_s,
             "score_pct": self.score_pct,
+            "total": self.total,
         }
 
     @classmethod
@@ -125,6 +130,7 @@ class StandingRow:
             losses=int(data["losses"]),
             think_time_s=float(data["think_time_s"]),
             score_pct=float(data["score_pct"]),
+            total=float(data.get("total", data["points"])),
         )
 
 
@@ -171,6 +177,15 @@ class TournamentResult:
         if data.get("version") != 1:
             raise ValueError("unsupported tournament data")
         battle = data.get("battle")
+        matchups = tuple(Matchup.from_json(item) for item in data["matchups"])
+        standings = tuple(StandingRow.from_json(row) for row in data["standings"])
+        if standings and any("total" not in row for row in data["standings"]):
+            # Results saved before the time-adjusted total existed: recompute the table.
+            standings = compute_standings(
+                tuple(data["participants"]),
+                matchups,
+                {row.bot_id: row.think_time_s for row in standings},
+            )
         return cls(
             tournament_id=data["tournament_id"],
             created_at=data["created_at"],
@@ -179,8 +194,8 @@ class TournamentResult:
             completed=bool(data["completed"]),
             games_played=int(data["games_played"]),
             games_total=int(data["games_total"]),
-            standings=tuple(StandingRow.from_json(row) for row in data["standings"]),
-            matchups=tuple(Matchup.from_json(item) for item in data["matchups"]),
+            standings=standings,
+            matchups=matchups,
             battle=None if battle is None else int(battle),
         )
 
@@ -190,7 +205,11 @@ def compute_standings(
     matchups: Iterable[Matchup],
     think_times: Mapping[str, float] | None = None,
 ) -> tuple[StandingRow, ...]:
-    """Rank bots by points, breaking ties with the lower total thinking time."""
+    """Rank bots by total = points + (average time - own time) / TIME_POINT_SECONDS.
+
+    Thinking less than the field average earns a bonus, more costs points; ties on the
+    total are broken by the lower thinking time.
+    """
     wins = {bot_id: 0 for bot_id in participants}
     draws = {bot_id: 0 for bot_id in participants}
     losses = {bot_id: 0 for bot_id in participants}
@@ -211,10 +230,19 @@ def compute_standings(
             points[bot_id] += score
 
     times = dict(think_times or {})
+    average = (
+        sum(times.get(bot_id, 0.0) for bot_id in participants) / len(participants)
+        if participants
+        else 0.0
+    )
+    totals = {
+        bot_id: points[bot_id] + (average - times.get(bot_id, 0.0)) / TIME_POINT_SECONDS
+        for bot_id in participants
+    }
 
     def strength(bot_id: str) -> tuple[float, float]:
-        """Smaller is better: more points first, then less total thinking time."""
-        return (-points[bot_id], times.get(bot_id, 0.0))
+        """Smaller is better: higher total first, then less total thinking time."""
+        return (-round(totals[bot_id], 9), times.get(bot_id, 0.0))
 
     ordered = sorted(participants, key=lambda bot_id: (strength(bot_id), bot_id))
 
@@ -237,6 +265,7 @@ def compute_standings(
                 losses=losses[bot_id],
                 think_time_s=times.get(bot_id, 0.0),
                 score_pct=(points[bot_id] / played) if played else 0.0,
+                total=totals[bot_id],
             )
         )
     return tuple(rows)

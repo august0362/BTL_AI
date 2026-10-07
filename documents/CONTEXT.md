@@ -142,6 +142,7 @@ BOT_REGISTRY: dict[str, str] = {
 DEBUG_BOTS: dict[str, str] = {"random": "ai.random_bot.bot:RandomBot"}
 BENCHMARK_BOTS: dict[str, str] = {
     "bench_random":           "ai.benchmarks.bot:BenchmarkRandomBot",
+    "bench_alphabeta_material": "ai.benchmarks.bot:BenchmarkMaterialBot",
     "bench_alphabeta3":       "ai.benchmarks.bot:BenchmarkAlphaBetaBot",
     "bench_alphabeta_tt":     "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
     "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",
@@ -154,7 +155,7 @@ def create_bot(bot_id: str, config: dict | None = None) -> BaseBot: ...  # impor
 
 Mỗi bot đặt lớp chính ở `backend/ai/<bot>/bot.py`.
 
-**Bot benchmark (quyết định 2026-10-07):** `BENCHMARK_BOTS` là danh sách **opt-in**, chỉ hiện khi gọi `list_bots(include_benchmarks=True)`. Màn Người vs Bot, Lịch sử và Xếp hạng Elo dùng mặc định nên không thấy 4 bot này; giải **Xếp hạng AI** (§4.9) nạp đủ 8 bot. `create_bot` nhận cả 4 khóa benchmark.
+**Bot benchmark (quyết định 2026-10-07, cập nhật cùng ngày):** `BENCHMARK_BOTS` là danh sách **opt-in**, chỉ trả về khi gọi `list_bots(include_benchmarks=True)`; mặc định của `list_bots()` không đổi. GUI gọi `list_bots(include_debug=show_debug_bots, include_benchmarks=True)` nên màn **Người vs Bot**, **Bot vs Bot** và **Xếp hạng Elo** đều có đủ **8 bot** (4 thành viên + 4 benchmark); giải **Xếp hạng AI** (§4.9) cũng nạp đủ 8 bot. Bot `baseline` (`BASELINE_BOTS`) **không** hiện trên GUI (không ở màn chọn, không ở bảng Elo). `create_bot` nhận cả 4 khóa benchmark.
 
 **Baseline ngẫu nhiên (quyết định 2026-10-04):** bot nào chưa có code thật thì tạm **đi nước hợp lệ ngẫu nhiên**, để GUI và giải đấu luôn chơi được đủ 4 bot.
 - Lớp dùng chung `backend/ai/baseline.py::RandomBaselineBot(BaseBot)`. Thuộc tính `is_baseline = True`, có `random.Random(config.get("seed"))` riêng. Đặt ở `backend/ai/` (không phải package bot), nên các bot được phép import.
@@ -380,7 +381,7 @@ class Ranking:
     def reset(self) -> None: ...                            # tự lưu file
 ```
 
-- Hồ sơ gồm 4 bot và **một hồ sơ chung `human`**.
+- Hồ sơ gồm **8 bot** (4 thành viên + 4 benchmark) và **một hồ sơ chung `human`**. Elo mọi hồ sơ bắt đầu từ `ranking.elo_initial` (1200) và chỉ thay đổi qua ván Người vs Bot / Bot vs Bot; giải Xếp hạng AI (§4.9) **không** ghi vào Elo.
 - Mỗi **ván** cập nhật W/D/L và Elo cho cả hai bên, dùng rating **trước** ván: `R_mới = R + K·(S − E)`.
 - `record_game` trả `False` và **không** thay đổi gì khi: ván ABORTED, `white_id == black_id`, hoặc một bên thuộc `debug_ids`.
 - File JSON: `{"version": 1, "players": {id: {wins, draws, losses, elo}}}`. Ghi an toàn: ghi file tạm cùng thư mục rồi `os.replace`.
@@ -407,14 +408,16 @@ Thang **bot benchmark** cho việc phân loại sức mạnh, tách khỏi xếp
 | id | Tên | Cách chơi |
 |---|---|---|
 | `bench_random` | Benchmark 1 · Random | Chọn đều ngẫu nhiên trong các nước hợp lệ (có `seed`) |
-| `bench_alphabeta3` | Benchmark 2 · Alpha-Beta 3 | Negamax alpha-beta, độ sâu cố định (mặc định 3), eval `ai.baseline.evaluate` |
-| `bench_alphabeta_tt` | Benchmark 3 · Alpha-Beta TT | Thêm bảng chuyển vị (Zobrist) và sắp xếp nước đi (MVV-LVA, phong cấp, killer) |
-| `bench_alphabeta_custom` | Benchmark 4 · Alpha-Beta Custom | Như Benchmark 3 với eval mô-đun chọn được (`evaluator`) |
+| `bench_alphabeta_material` | Benchmark 1.5 · Alpha-Beta thuần | Negamax alpha-beta độ sâu 3, eval `material` (tổng quân mình − tổng quân địch), tất định — mốc "Alpha-Beta thuần" |
+| `bench_alphabeta3` | Benchmark 2 · Alpha-Beta 3 | Negamax alpha-beta, độ sâu cố định (mặc định 3), eval `pst` (vật chất + bảng ô quân), hòa ngẫu nhiên có `seed` giữa các nước tốt nhất |
+| `bench_alphabeta_tt` | Benchmark 3 · Alpha-Beta TT | Eval `pst` như Benchmark 2 + bảng chuyển vị (Zobrist), sắp xếp nước đi (MVV-LVA, phong cấp, killer) và **quiescence search** (chỉ xét nước ăn quân ở lá, tối đa 8 nửa nước) |
+| `bench_alphabeta_custom` | Benchmark 4 · Alpha-Beta Custom | Như Benchmark 3 + check extension (tối đa 2 lần) + mobility (mã/tượng 4, xe 2, hậu 1 điểm mỗi ô kiểm soát), độ sâu mặc định 3; khi `depth >= 4` bật thêm null-move pruning (R=2) + late move reductions; eval mặc định `advanced` = `pst` + cấu trúc tốt (chồng −15, cô lập −15, thông +5..+100 theo hàng) + an toàn vua trước tàn cuộc (thiếu tốt che −15/cột, cột mở quanh vua −20) + cặp tượng +30 + xe cột mở +20 / nửa mở +10; tính bằng bitboard, cache theo vị trí tốt và vua; đổi được qua `evaluator` |
 
 ```python
 # backend/ai/benchmarks/evaluation.py   (eval trả điểm theo bên đang đi, dùng cho negamax)
 def material_evaluator(board) -> float: ...     # bọc ai.baseline.evaluate
 def positional_evaluator(board) -> float: ...   # thêm kiểm soát trung tâm + phát triển quân
+def pst_evaluator(board) -> float: ...          # Benchmark 2: vật chất + bảng ô quân, chiếu hết theo ply
 def register_evaluator(name: str, evaluator) -> None: ...   # mở rộng cho Benchmark 4
 def build_evaluator(name: str = "positional") -> Callable: ...   # tên lạ -> ValueError
 
@@ -435,6 +438,13 @@ def alpha_beta_iterative(board, max_depth, evaluator, *, tt=None, killers=None,
     # sâu dần 1..max_depth; hết `time_limit_s` (giây) thì bỏ kết quả dở và trả nước
     # của tầng sâu nhất đã tính xong. time_limit_s=None/<=0 -> tính đủ max_depth.
 ```
+
+**Benchmark 2 — mục tiêu độ khó (quyết định 2026-10-07):** người chơi bình thường **thắng được nếu chơi cẩn thận**, nhưng **không thắng nhanh** bằng mẹo đơn giản. Vì vậy:
+- Eval `pst` (`evaluation.pst_evaluator`, đăng ký tên `"pst"`): `PIECE_VALUES` + bảng ô quân "Simplified Evaluation Function" (Tomasz Michniewski) cho tốt, mã, tượng, xe, hậu; vua dùng bảng trung cuộc, chuyển sang bảng tàn cuộc khi **cả hai bên không còn hậu** hoặc mỗi bên có ≤ 1 quân nhẹ ngoài tốt. Bảng viết theo góc nhìn Trắng (a8 ở đầu mảng), Đen lật hàng (`chess.square_mirror`).
+- Chiếu hết: `-(MATE_SCORE - board.ply())` theo bên đang đi → bot ưu tiên chiếu hết **nhanh** và chống đỡ **lâu**. Hòa (`is_stalemate`, `is_insufficient_material`, `is_repetition(3)`, `can_claim_fifty_moves`) = 0 → khi đang hơn quân bot tránh lặp nước.
+- **Không** có quiescence search (cố ý: bot còn lỗi "đường chân trời" — người chơi có thể khai thác bằng chiến thuật đổi quân/đòn phối hợp).
+- Ở gốc, các nước có điểm bằng nhau (chênh ≤ 1e-9) được chọn ngẫu nhiên bằng `random.Random(config.get("seed"))` → không học thuộc được một đường thắng duy nhất; cùng `seed` thì vẫn tất định. `alpha_beta_iterative(..., rng=None)` nhận thêm `rng` (mặc định `None` = hành vi cũ, nước đầu tiên); chỉ Benchmark 2 truyền `rng`.
+- `[bots.bench_alphabeta3] evaluator` (mặc định `"pst"`) cho phép đổi eval; `material_evaluator` giữ nguyên cho test và các bot khác.
 
 `bench_alphabeta_tt` / `bench_alphabeta_custom` giữ bảng chuyển vị và killer **trong một ván**; `reset()` (gọi đầu mỗi ván) xóa cả hai.
 Ba bot tìm kiếm dùng `alpha_beta_iterative` với `config["max_think_time_s"]` (không có/<=0 = không giới hạn) nên **không bao giờ vượt trần thời gian mỗi nước**.
@@ -512,8 +522,8 @@ class TournamentHistory:
 | Màn hình | Nội dung |
 |---|---|
 | Menu chính | Người vs Bot · Bot vs Bot · **Xếp hạng AI** · Lịch sử · Xếp hạng · Cài đặt · Thoát |
-| Chuẩn bị (Người vs Bot) | Chọn 1 trong 4 bot, chọn màu Trắng/Đen/**Ngẫu nhiên**, đổi phe tự do. Bấm Bắt đầu |
-| Chuẩn bị (Bot vs Bot) | Chọn bot Trắng và bot Đen độc lập (được trùng nhau), nút hoán đổi, chọn 1 ván / Best of 3 |
+| Chuẩn bị (Người vs Bot) | Chọn 1 trong 8 bot (4 thành viên + 4 benchmark), chọn màu Trắng/Đen/**Ngẫu nhiên**, đổi phe tự do. Bấm Bắt đầu |
+| Chuẩn bị (Bot vs Bot) | Chọn bot Trắng và bot Đen độc lập trong 8 bot (được trùng nhau), nút hoán đổi, chọn 1 ván / Best of 3 |
 | Ván đấu | Bàn cờ + panel. **Không Undo, không đổi phe.** Có nút Dừng ván và icon loa |
 | Bot vs Bot đang chạy | Như trên, thêm Tạm dừng / Tiếp tục / Tốc độ (độ trễ giữa các nước) |
 | Lịch sử | Danh sách 20 ván. Mở ra là màn Xem lại |
@@ -684,7 +694,7 @@ class App:
 - Click bàn cờ → `board_geometry.square_at` → `MoveInput.click(snapshot.board, square, human_color)` → `move` thì `controller.submit_human_move`; `promotion` thì mở hộp chọn 4 quân (có nút hủy → `MoveInput.clear()`).
 - Panel MVP: tên 2 bên + "đang suy nghĩ…", thanh đánh giá (`MoveRecord.material_eval` của nước cuối), danh sách nước đi SAN (cuộn, nước mới nhất luôn thấy), thời gian suy nghĩ (`game_info.think_time_summary`), quân bị ăn (`game_info.captured_pieces`), nút "Dừng ván" / "Về menu". Mỗi mục có mũi tên thu gọn/mở rộng.
 - Ván xong: hiện kết quả (`t("game.result.*")` + `t("termination.*")`) đè lên bàn cờ, nút "Chơi lại" và "Về menu".
-- Màn Chuẩn bị Người vs Bot: chọn bot trong `registry.list_bots(include_debug=config["ui"]["show_debug_bots"])`; bot nào `create_bot` raise `BotUnavailableError` thì hiện mờ kèm lý do (thử tạo một lần khi mở màn). Chọn màu Trắng / Đen / Ngẫu nhiên. Nút Bắt đầu, Quay lại.
+- Màn Chuẩn bị Người vs Bot: chọn bot trong `registry.list_bots(include_debug=config["ui"]["show_debug_bots"], include_benchmarks=True)`; bot nào `create_bot` raise `BotUnavailableError` thì hiện mờ kèm lý do (thử tạo một lần khi mở màn). Chọn màu Trắng / Đen / Ngẫu nhiên. Nút Bắt đầu, Quay lại.
 - Mọi chuỗi qua `translator.t(...)`. Font: `pygame.font.SysFont` có hỗ trợ tiếng Việt (thử "segoeui", "arial", mặc định).
 
 ### 5.11 M4 — các màn còn lại
@@ -741,7 +751,7 @@ goto(name)            # thêm "setup_bots", "history", "leaderboard", "settings"
 def start_bot_game(self, white_id: str, black_id: str, n_games: int) -> None: ...  # -> "game"
 def open_replay(self, game_id: str) -> None: ...         # -> "replay"
 replay_model: ReplayModel | None                          # property
-ranking: Ranking; history: History                        # property; Ranking(known_ids=list_bots()+["human"])
+ranking: Ranking; history: History                        # property; Ranking(known_ids=list_bots(include_benchmarks=True)+["human"])
 sound_enabled: bool                                       # property
 def set_sound_enabled(self, enabled: bool) -> None: ...   # lưu ui.sound_enabled vào local config
 def set_language(self, language: str) -> None: ...        # đổi ngay + lưu ui.language
@@ -750,7 +760,7 @@ def reset_ranking(self) -> None: ...                      # nút Reset (sau hộ
 ```
 
 **Màn hình:**
-- **Chuẩn bị Bot vs Bot:** chọn bot Trắng và bot Đen (cho phép trùng nhau; bot không khả dụng thì hiện mờ kèm lý do), nút Đổi bên, chọn 1 ván / Best of 3, Bắt đầu, Quay lại.
+- **Chuẩn bị Bot vs Bot:** chọn bot Trắng và bot Đen trong `list_bots(include_debug=show_debug_bots, include_benchmarks=True)` (cho phép trùng nhau; bot không khả dụng thì hiện mờ kèm lý do), nút Đổi bên, chọn 1 ván / Best of 3, Bắt đầu, Quay lại.
 - **Ván đấu (Bot vs Bot):** như Người vs Bot, cộng thêm: tỷ số loạt + "Ván i/n", nút Tạm dừng/Tiếp tục, nút Tốc độ (xoay vòng 0 / 150 / 300 / 800 ms qua `set_bot_move_delay`). Loạt xong thì hiện kết quả loạt (`game.result.series_win` / `series_draw`).
 - **Lịch sử:** danh sách `history.list()`: "Trắng vs Đen — kết quả — lý do — ngày", có ghi chú loạt (`history.series_note`). Click một dòng → `open_replay`. Nút Xuất PGN ghi `data_dir/exports/<game_id>.pgn` và hiện `history.exported`.
 - **Xem lại:** bàn cờ (lật nếu người chơi cầm đen) + nút Về đầu / Lùi / Phát-Dừng / Tiến / Về cuối, tốc độ, nút Xuất PGN, panel nước đi (tô nước hiện tại), thanh đánh giá theo `current_move`. Mỗi frame gọi `tick`.

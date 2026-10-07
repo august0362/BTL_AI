@@ -12,6 +12,7 @@ from gui.screens.base import Screen
 from gui.tournament_view import (
     format_points,
     format_seconds,
+    format_total,
     provisional_standings,
     tournament_rows,
 )
@@ -28,12 +29,13 @@ class TournamentScreen(Screen):
     COLUMNS = (
         ("tournament.rank", 70),
         ("tournament.bot", 130),
-        ("tournament.games", 505),
-        ("tournament.wins", 565),
-        ("tournament.draws", 630),
-        ("tournament.losses", 695),
-        ("tournament.points", 755),
-        ("tournament.time", 830),
+        ("tournament.games", 440),
+        ("tournament.wins", 500),
+        ("tournament.draws", 560),
+        ("tournament.losses", 615),
+        ("tournament.points", 675),
+        ("tournament.time", 740),
+        ("tournament.total", 825),
     )
 
     def __init__(self, app: App) -> None:
@@ -75,7 +77,14 @@ class TournamentScreen(Screen):
         for key, x in self.COLUMNS:
             canvas.blit(header_font.render(translator.t(key), True, roles["accent"]), (x, 128))
         row_font = get_font(12)
-        for index, row in enumerate(tournament_rows(standings, translator)[:8]):
+        playing = set(snapshot.current_pair or ()) if snapshot.running else set()
+        for index, row in enumerate(tournament_rows(standings, translator)[:9]):
+            y = 160 + index * 26
+            if row.player_id in playing:
+                # Highlight the two bots of the game in progress with theme colours.
+                band = pygame.Rect(60, y - 5, 840, 24)
+                canvas.draw_rect(roles["surface"], band, radius=6)
+                canvas.draw_rect(roles["accent"], band, width=2, radius=6)
             values = (
                 str(row.rank),
                 row.name,
@@ -85,8 +94,8 @@ class TournamentScreen(Screen):
                 str(row.losses),
                 format_points(row.points),
                 format_seconds(row.think_time_s),
+                format_total(row.total),
             )
-            y = 160 + index * 29
             for value, (_, x) in zip(values, self.COLUMNS, strict=True):
                 canvas.blit(row_font.render(value, True, roles["text"]), (x, y))
         self.progress_bar.draw(canvas, self.app.theme, snapshot.progress)
@@ -112,9 +121,11 @@ class TournamentScreen(Screen):
         if snapshot.standings:
             return snapshot.standings
         battles = self.app.tournament_history.list()
-        if battles and battles[0].standings:
+        bots = self.app.tournament.settings.bots
+        # Show the last battle only while its line-up matches the configured bots.
+        if battles and battles[0].standings and set(battles[0].participants) == set(bots):
             return battles[0].standings
-        return provisional_standings(self.app.tournament.settings.bots)
+        return provisional_standings(bots)
 
     def _status(self, snapshot) -> str:
         translator = self.app.translator

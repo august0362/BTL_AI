@@ -49,9 +49,9 @@ device = "cpu"
 # Các bot tham gia vòng tròn. Mặc định: 4 bot thành viên + 4 bot benchmark.
 bots = [
     "alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl",
-    "bench_random", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom",
+    "bench_random", "bench_alphabeta_material", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom",
 ]
-matches_per_pair = 4      # số ván mỗi cặp; chia đều Trắng/Đen
+matches_per_pair = 6      # số ván mỗi cặp; chia đều Trắng/Đen
 max_history = 10           # số "Trận Chiến Lần n" lưu lại gần nhất
 max_plies = 300            # quá số nửa nước này thì xử hòa (tránh vờn nhau)
 # > 0: ép mọi bot tìm kiếm đúng độ sâu này (chậm hơn nếu bot của thành viên nặng).
@@ -65,12 +65,21 @@ seed = -1                  # -1 = ngẫu nhiên mỗi lần chạy; >= 0 để t
 [bots.bench_random]
 seed = -1
 
-[bots.bench_alphabeta3]
+[bots.bench_alphabeta_material]
+# Benchmark 1.5: alpha-beta thuần, điểm = tổng quân mình − tổng quân địch
 depth = 3
+
+[bots.bench_alphabeta3]
+# Benchmark 2
+depth = 3
+evaluator = "pst"   
 
 [bots.bench_alphabeta_tt]
+# Benchmark 3
 depth = 3
+evaluator = "pst"
 
 [bots.bench_alphabeta_custom]
+# Benchmark 4: độ sâu 3 + check extension; đặt 4 để bật null-move/LMR (mạnh hơn, ~0.3 s/nước)
 depth = 3
-evaluator = "positional"   # tên evaluator trong ai.benchmarks.evaluation
+evaluator = "advanced"

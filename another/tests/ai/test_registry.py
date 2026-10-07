@@ -8,7 +8,13 @@ registry = require_module("ai.registry")
 base = require_module("ai.base_bot")
 
 OFFICIAL = ["alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl"]
-BENCHMARKS = ["bench_random", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom"]
+BENCHMARKS = [
+    "bench_random",
+    "bench_alphabeta_material",
+    "bench_alphabeta3",
+    "bench_alphabeta_tt",
+    "bench_alphabeta_custom",
+]
 
 
 def test_official_bots_in_order():

@@ -24,7 +24,7 @@ class SetupBotsScreen(Screen):
         super().__init__(app)
         self.bot_ids = registry.list_bots(
             include_debug=app.config.get("ui", {}).get("show_debug_bots", False),
-            include_baseline=True,
+            include_benchmarks=True,
         )
         self.available: dict[str, tuple[bool, str]] = {}
         for bot_id in self.bot_ids:
@@ -49,10 +49,14 @@ class SetupBotsScreen(Screen):
         self.white_index = self.bot_ids.index(white) if white else 0
         self.black_index = self.bot_ids.index(black) if black else 0
         self.series_index = 0 if app.n_games == 1 else 1
-        row_step = 38 if len(self.bot_ids) > 5 else 48
+        row_step = 36
+        # Shift the bot columns up when more than eight bots would overlap the Swap button.
+        self._top = 196 if len(self.bot_ids) <= 8 else 160
+        has_unavailable = any(not available for available, _ in self.available.values())
+        button_height = 23 if has_unavailable else 30
         self.buttons = [
             Button(
-                pygame.Rect(250, 202 + i * row_step, 220, 34),
+                pygame.Rect(220, self._top + i * row_step, 235, button_height),
                 self._button_label(bot),
                 enabled=self.available[bot][0],
             )
@@ -60,7 +64,7 @@ class SetupBotsScreen(Screen):
         ]
         self.black_buttons = [
             Button(
-                pygame.Rect(490, 202 + i * row_step, 220, 34),
+                pygame.Rect(505, self._top + i * row_step, 235, button_height),
                 self._button_label(bot),
                 enabled=self.available[bot][0],
             )
@@ -68,19 +72,20 @@ class SetupBotsScreen(Screen):
         ]
         self.format_buttons = [
             Button(
-                pygame.Rect(350 + i * 135, 490, 125, 38),
+                pygame.Rect(350 + i * 135, 562 if has_unavailable else 564, 125, 32),
                 app.translator.t(key),
                 selected=i == self.series_index,
             )
             for i, key in enumerate(("setup.single_game", "setup.best_of_three"))
         ]
         self.swap = Button(
-            pygame.Rect(424, 442, 112, 34),
+            pygame.Rect(424, 524 if has_unavailable else 530, 112, 30),
             app.translator.t("setup.swap"),
         )
-        self.start = Button(pygame.Rect(365, 548, 110, 40), app.translator.t("setup.start"))
+        action_y = 602 if has_unavailable else 604
+        self.start = Button(pygame.Rect(360, action_y, 110, 28), app.translator.t("setup.start"))
         self.start.style = "primary"
-        self.back = Button(pygame.Rect(485, 548, 110, 40), app.translator.t("setup.back"))
+        self.back = Button(pygame.Rect(490, action_y, 110, 28), app.translator.t("setup.back"))
         self.error = ""
 
     def handle_click(self, x: float, y: float) -> None:
@@ -119,17 +124,17 @@ class SetupBotsScreen(Screen):
 
     def draw(self, canvas: Render) -> None:
         canvas.fill(self.app.theme.roles["bg"])
-        font = get_font(15)
+        font = get_font(13)
         canvas.blit(
             get_font(27, bold=True).render(
                 self.app.translator.t("setup.title_bots"), True, self.app.theme.roles["text"]
             ),
-            (295, 112),
+            (295, self._top - 84),
         )
-        for x, key in ((250, "setup.white_bot"), (490, "setup.black_bot")):
+        for x, key in ((220, "setup.white_bot"), (505, "setup.black_bot")):
             canvas.blit(
                 font.render(self.app.translator.t(key), True, self.app.theme.roles["text_muted"]),
-                (x, 176),
+                (x, self._top - 26),
             )
         for i, button in enumerate(self.buttons):
             button.selected = i == self.white_index
@@ -140,8 +145,8 @@ class SetupBotsScreen(Screen):
                     "setup.bot_unavailable", reason=self.available[bot_id][1]
                 )
                 canvas.blit(
-                    render_fit(get_font(9), reason, self.app.theme.roles["text_muted"], 220),
-                    (250, button.rect.bottom + 1),
+                    render_fit(get_font(9), reason, self.app.theme.roles["text_muted"], 235),
+                    (220, button.rect.bottom + 1),
                 )
         for i, button in enumerate(self.black_buttons):
             button.selected = i == self.black_index
@@ -152,8 +157,8 @@ class SetupBotsScreen(Screen):
                     "setup.bot_unavailable", reason=self.available[bot_id][1]
                 )
                 canvas.blit(
-                    render_fit(get_font(9), reason, self.app.theme.roles["text_muted"], 220),
-                    (490, button.rect.bottom + 1),
+                    render_fit(get_font(9), reason, self.app.theme.roles["text_muted"], 235),
+                    (505, button.rect.bottom + 1),
                 )
         self.swap.draw(canvas, font)
         for button in self.format_buttons:
@@ -162,7 +167,8 @@ class SetupBotsScreen(Screen):
         self.back.draw(canvas, font)
         if self.error:
             canvas.blit(
-                render_fit(font, self.error, self.app.theme.roles["text_muted"], 800), (80, 606)
+                render_fit(get_font(10), self.error, self.app.theme.roles["text_muted"], 250),
+                (620, 610),
             )
 
     def _button_label(self, bot_id: str) -> str:

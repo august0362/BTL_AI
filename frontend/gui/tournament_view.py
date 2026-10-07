@@ -21,13 +21,14 @@ class TournamentRow:
     losses: int
     points: float
     think_time_s: float
+    total: float = 0.0
 
 
 def tournament_rows(standings: Sequence[StandingRow], translator) -> list[TournamentRow]:
-    """Project standings into localized rows, keeping their order and rank."""
+    """Project standings into localized rows numbered 1..n in table order (ties stay ordered)."""
     return [
         TournamentRow(
-            rank=row.rank,
+            rank=index + 1,
             player_id=row.bot_id,
             name=translator.t(f"players.{row.bot_id}"),
             games=row.games,
@@ -36,8 +37,9 @@ def tournament_rows(standings: Sequence[StandingRow], translator) -> list[Tourna
             losses=row.losses,
             points=row.points,
             think_time_s=row.think_time_s,
+            total=row.total,
         )
-        for row in standings
+        for index, row in enumerate(standings)
     ]
 
 
@@ -66,6 +68,11 @@ def provisional_standings(bot_ids: Sequence[str]) -> tuple[StandingRow, ...]:
 def format_points(points: float) -> str:
     """Format match points without a trailing ``.0``."""
     return f"{points:g}"
+
+
+def format_total(total: float) -> str:
+    """Format the time-adjusted total with two decimals."""
+    return f"{total:.2f}"
 
 
 def format_seconds(seconds: float) -> str:

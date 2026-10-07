@@ -15,6 +15,7 @@
 - Test: `another/tests/ai/test_benchmarks.py`, `another/tests/tournament/test_round_robin.py`, `test_tournament_history.py`, `another/tests/gui/test_tournament_view.py`, `test_tournament_smoke.py`.
 
 ### Changed
+- **Elo + chọn bot cho đủ 8 bot** (ELO-1): bảng Xếp hạng Elo gồm 8 bot (4 thành viên + 4 benchmark) và `human`, bỏ `baseline`; màn Người vs Bot và Bot vs Bot chọn được cả 8 bot (`list_bots(include_benchmarks=True)`), bố cục xếp lại cho vừa. Giải Xếp hạng AI vẫn không ghi vào Elo.
 - `backend/ai/registry.py`: thêm `BENCHMARK_BOTS` (opt-in) và tham số `list_bots(include_benchmarks=...)`; mặc định không đổi.
 - `backend/ai/baseline.py`: tách hàm dùng chung `evaluate(board)`; `RandomBaselineBot` gọi lại hàm này (hành vi không đổi).
 - `pyproject.toml`: thêm `ai.benchmarks` vào contract "bot độc lập".

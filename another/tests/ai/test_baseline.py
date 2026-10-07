@@ -13,8 +13,10 @@ OFFICIAL_BOT_IDS = registry.list_bots()
 def test_official_baselines_are_legal_and_seed_deterministic(bot_id: str) -> None:
     first = registry.create_bot(bot_id, {"seed": 17})
     second = registry.create_bot(bot_id, {"seed": 17})
+
     if not first.is_baseline:
         pytest.skip(f"{bot_id} is a real implementation, not a baseline")
+
     assert isinstance(first, RandomBaselineBot)
     assert first.is_baseline is True
     assert second.is_baseline is True

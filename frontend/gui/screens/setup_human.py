@@ -25,7 +25,8 @@ class SetupHumanScreen(Screen):
     def __init__(self, app: App) -> None:
         super().__init__(app)
         self.bot_ids = registry.list_bots(
-            include_debug=app.config.get("ui", {}).get("show_debug_bots", False)
+            include_debug=app.config.get("ui", {}).get("show_debug_bots", False),
+            include_benchmarks=True,
         )
         self.available: dict[str, tuple[bool, str]] = {}
         for bot_id in self.bot_ids:
@@ -44,28 +45,29 @@ class SetupHumanScreen(Screen):
         )
         self.color_index = 0
         self.bot_buttons: list[Button] = []
-        self.reason_positions: list[tuple[int, str]] = []
-        row_y = 205
-        for bot_id in self.bot_ids:
+        self.reason_positions: list[tuple[int, int, str]] = []
+        row_start = 198
+        row_step = 50
+        for index, bot_id in enumerate(self.bot_ids):
             enabled, reason = self.available[bot_id]
+            column = index % 2
+            row_y = row_start + (index // 2) * row_step
+            x = 180 + column * 310
             self.bot_buttons.append(
                 Button(
-                    pygame.Rect(330, row_y, 300, 34),
+                    pygame.Rect(x, row_y, 290, 34),
                     app._localized_bot_name(bot_id),
                     enabled=enabled,
                     selected=bot_id == self.selected_bot,
                 )
             )
             if not enabled:
-                self.reason_positions.append((row_y + 35, reason))
-                row_y += 54
-            else:
-                row_y += 42
-        color_y = max(410, row_y + 28)
-        action_y = color_y + 50
+                self.reason_positions.append((x, row_y + 35, reason))
+        color_y = 487
+        action_y = 566
         self.color_buttons = [
             Button(
-                pygame.Rect(330 + index * 102, color_y, 96, 40),
+                pygame.Rect(324 + index * 104, color_y, 98, 38),
                 app.translator.t(key),
                 selected=index == 0,
             )
@@ -74,11 +76,11 @@ class SetupHumanScreen(Screen):
             )
         ]
         self.start_button = Button(
-            pygame.Rect(410, action_y, 140, 42), app.translator.t("setup.start")
+            pygame.Rect(330, action_y, 140, 40), app.translator.t("setup.start")
         )
         self.start_button.style = "primary"
         self.back_button = Button(
-            pygame.Rect(410, action_y + 50, 140, 38), app.translator.t("setup.back")
+            pygame.Rect(490, action_y, 140, 40), app.translator.t("setup.back")
         )
         self.error = ""
 
@@ -124,10 +126,10 @@ class SetupHumanScreen(Screen):
         )
         for button in self.bot_buttons:
             button.draw(canvas, get_font(15, bold=True))
-        for y, reason in self.reason_positions:
+        for x, y, reason in self.reason_positions:
             label = self.app.translator.t("setup.bot_unavailable", reason=reason)
-            text = render_fit(get_font(11), label, self.app.theme.roles["text_muted"], 300)
-            canvas.blit(text, (330, y))
+            text = render_fit(get_font(10), label, self.app.theme.roles["text_muted"], 290)
+            canvas.blit(text, (x, y))
         canvas.blit(
             render_fit(
                 get_font(16),
@@ -135,7 +137,7 @@ class SetupHumanScreen(Screen):
                 self.app.theme.roles["text_muted"],
                 300,
             ),
-            (330, self.color_buttons[0].rect.top - 28),
+            (324, self.color_buttons[0].rect.top - 25),
         )
         for button in self.color_buttons:
             button.draw(canvas, get_font(15))
@@ -143,6 +145,6 @@ class SetupHumanScreen(Screen):
         self.back_button.draw(canvas, get_font(16))
         if self.error:
             canvas.blit(
-                render_fit(get_font(13), self.error, self.app.theme.roles["text_muted"], 394),
-                (558, self.back_button.rect.top + 10),
+                render_fit(get_font(13), self.error, self.app.theme.roles["text_muted"], 300),
+                (640, self.back_button.rect.top + 12),
             )
