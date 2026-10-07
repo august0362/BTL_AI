@@ -1,6 +1,8 @@
-"""Alpha-Beta bot implementation replacing random move selection."""
+"""Shared random baseline bot plus the material evaluation reused by Benchmark 2."""
 
 from __future__ import annotations
+
+import random
 
 import chess
 
@@ -35,84 +37,16 @@ def evaluate(board: chess.Board) -> int:
 
 
 class RandomBaselineBot(BaseBot):
-    """Select the best legal move using Alpha-Beta pruning."""
+    """Placeholder for unfinished bots: pick a seeded uniformly random legal move."""
 
-    is_baseline = False
+    is_baseline = True
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
-        # Độ sâu tìm kiếm (mặc định là 3 nước nếu không cấu hình)
-        self.depth: int = self.config.get("depth", 3)
-
-    def _evaluate(self, board: chess.Board) -> int:
-        """Backward-compatible wrapper around the module-level evaluation."""
-        return evaluate(board)
-
-    def _alphabeta(
-        self,
-        board: chess.Board,
-        depth: int,
-        alpha: float,
-        beta: float,
-        maximizing_player: bool,
-    ) -> float:
-        """Thuật toán Minimax kết hợp cắt tỉa Alpha-Beta."""
-        if depth == 0 or board.is_game_over():
-            return float(self._evaluate(board))
-
-        if maximizing_player:
-            max_eval = float("-inf")
-            for move in board.legal_moves:
-                board.push(move)
-                eval_score = self._alphabeta(board, depth - 1, alpha, beta, False)
-                board.pop()
-                max_eval = max(max_eval, eval_score)
-                alpha = max(alpha, eval_score)
-                if beta <= alpha:
-                    break  # Cắt tỉa nhánh beta
-            return max_eval
-        else:
-            min_eval = float("inf")
-            for move in board.legal_moves:
-                board.push(move)
-                eval_score = self._alphabeta(board, depth - 1, alpha, beta, True)
-                board.pop()
-                min_eval = min(min_eval, eval_score)
-                beta = min(beta, eval_score)
-                if beta <= alpha:
-                    break  # Cắt tỉa nhánh alpha
-            return min_eval
+        self._rng = random.Random(self.config.get("seed"))
 
     def select_move(self, board: chess.Board) -> chess.Move:
-        """Thay vì chọn ngẫu nhiên, tìm nước đi tối ưu nhất theo Alpha-Beta."""
-        best_move: chess.Move | None = None
-        is_white = board.turn == chess.WHITE
-
-        if is_white:
-            best_val = float("-inf")
-            alpha = float("-inf")
-            beta = float("inf")
-            for move in board.legal_moves:
-                board.push(move)
-                val = self._alphabeta(board, self.depth - 1, alpha, beta, False)
-                board.pop()
-                if val > best_val:
-                    best_val = val
-                    best_move = move
-                alpha = max(alpha, val)
-        else:
-            best_val = float("inf")
-            alpha = float("-inf")
-            beta = float("inf")
-            for move in board.legal_moves:
-                board.push(move)
-                val = self._alphabeta(board, self.depth - 1, alpha, beta, True)
-                board.pop()
-                if val < best_val:
-                    best_val = val
-                    best_move = move
-                beta = min(beta, val)
-
-        self.last_search_info = {"eval": best_val, "depth": self.depth}
-        # Nếu vì lý do nào đó không tìm được (chỉ còn 1 nước), bốc nước đầu tiên
-        return best_move if best_move is not None else next(iter(board.legal_moves))
+        """Return a uniformly selected legal move."""
+        moves = sorted(board.legal_moves, key=lambda move: move.uci())
+        self.last_search_info = {}
+        return self._rng.choice(moves)

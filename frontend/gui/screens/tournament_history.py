@@ -9,7 +9,7 @@ import pygame
 from gui.assets_loader import get_font
 from gui.render import Render
 from gui.screens.base import Screen
-from gui.tournament_view import format_matchup, format_points, tournament_rows
+from gui.tournament_view import format_matchup, format_points, format_total, tournament_rows
 from gui.widgets.button import Button
 
 if TYPE_CHECKING:
@@ -116,22 +116,24 @@ class TournamentHistoryScreen(Screen):
         for key, x in (
             ("tournament.rank", 340),
             ("tournament.bot", 390),
-            ("tournament.points", 730),
-            ("tournament.time", 820),
+            ("tournament.points", 680),
+            ("tournament.time", 750),
+            ("tournament.total", 830),
         ):
             canvas.blit(
                 get_font(12, bold=True).render(translator.t(key), True, roles["accent"]), (x, 120)
             )
         font = get_font(12)
-        for index, row in enumerate(tournament_rows(result.standings, translator)[:8]):
-            y = 150 + index * 25
+        for index, row in enumerate(tournament_rows(result.standings, translator)[:9]):
+            y = 150 + index * 22
             values = (
                 str(row.rank),
                 row.name,
                 format_points(row.points),
                 f"{row.think_time_s:.1f}s",
+                format_total(row.total),
             )
-            for value, x in zip(values, (340, 390, 730, 820), strict=True):
+            for value, x in zip(values, (340, 390, 680, 750, 830), strict=True):
                 canvas.blit(font.render(value, True, roles["text"]), (x, y))
         canvas.blit(
             get_font(14, bold=True).render(

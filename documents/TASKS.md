@@ -131,3 +131,4 @@ việc cần thiết đã được đánh dấu xong và merge vào `main`. M0 �
 - [x] **GUI-T1** `X` Mục **Xếp hạng AI** trong Board Menu (dưới "Bot vs Bot", trên "Lịch sử") + màn lịch sử riêng, chạy nền, thanh tiến trình, nút Dừng đấu
 - [x] **T8-01** `X` Test: `test_benchmarks.py`, `test_round_robin.py`, `test_tournament_history.py`, `test_tournament_view.py`, `test_tournament_smoke.py`
 - [ ] **U8-01** `U` Chạy thử giải đầy đủ trên GUI, duyệt bố cục bảng/nút, báo lỗi
+- [x] **ELO-1** `X` Elo cho `human` + 8 bot (bỏ `baseline`); Người vs Bot / Bot vs Bot chọn được cả 8 bot (`documents/codex/ELO-1_all_bots.md`)

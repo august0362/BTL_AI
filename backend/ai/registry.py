@@ -14,6 +14,7 @@ DEBUG_BOTS: dict[str, str] = {"random": "ai.random_bot.bot:RandomBot"}
 BASELINE_BOTS: dict[str, str] = {"baseline": "ai.random_bot.bot:BaselineBot"}
 BENCHMARK_BOTS: dict[str, str] = {
     "bench_random": "ai.benchmarks.bot:BenchmarkRandomBot",
+    "bench_alphabeta_material": "ai.benchmarks.bot:BenchmarkMaterialBot",
     "bench_alphabeta3": "ai.benchmarks.bot:BenchmarkAlphaBetaBot",
     "bench_alphabeta_tt": "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
     "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",

@@ -6,11 +6,11 @@ Menu chính có các lựa chọn **Người vs Bot**, **Bot vs Bot**, **Lịch 
 
 ## Người vs Bot
 
-Chọn một bot đang khả dụng, sau đó chọn quân Trắng, Đen hoặc Ngẫu nhiên rồi bấm **Bắt đầu**. Bot màu xám chưa thể khởi tạo được; dòng bên dưới nút nêu lý do, thường là bot chưa triển khai hoặc thiếu trọng số cần thiết. Trên bàn cờ, chọn quân rồi chọn ô đến để đi; khi đi Tốt tới hàng cuối, chọn quân phong cấp trong hộp thoại.
+Chọn một trong 8 bot (4 bot thành viên và 4 bot benchmark) đang khả dụng, sau đó chọn quân Trắng, Đen hoặc Ngẫu nhiên rồi bấm **Bắt đầu**. Bot màu xám chưa thể khởi tạo được; dòng bên dưới nút nêu lý do, thường là bot chưa triển khai hoặc thiếu trọng số cần thiết. Trên bàn cờ, chọn quân rồi chọn ô đến để đi; khi đi Tốt tới hàng cuối, chọn quân phong cấp trong hộp thoại.
 
 ## Bot vs Bot
 
-Chọn bot Trắng và bot Đen độc lập (có thể chọn cùng bot cho cả hai bên). Có thể đổi bên bằng nút hoán đổi, rồi chọn **1 ván** hoặc **Best of 3** trước khi bắt đầu. Khai cuộc ngẫu nhiên mặc định chỉ áp dụng cho chế độ này.
+Chọn bot Trắng và bot Đen độc lập trong 8 bot (có thể chọn cùng bot cho cả hai bên). Có thể đổi bên bằng nút hoán đổi, rồi chọn **1 ván** hoặc **Best of 3** trước khi bắt đầu. Khai cuộc ngẫu nhiên mặc định chỉ áp dụng cho chế độ này.
 
 ## Ván đấu
 
@@ -30,7 +30,7 @@ Các nút điều khiển đưa ván về đầu, lùi một nửa nước, phá
 
 ## Xếp hạng
 
-Bảng hiển thị thứ hạng, số ván, thắng, hòa, thua, điểm và Elo cho người chơi cùng bot. Elo là điểm ước lượng sức chơi tương đối, bắt đầu ở 1200 theo cấu hình mặc định. Thắng làm điểm tăng nhiều hơn khi đối thủ mạnh hơn, còn thua làm điểm giảm; hòa thường chỉ điều chỉnh nhẹ. Nút **Đặt lại** yêu cầu xác nhận trước khi xóa dữ liệu xếp hạng.
+Bảng hiển thị thứ hạng, số ván, thắng, hòa, thua, điểm và Elo cho người chơi cùng 8 bot. Elo chỉ tính từ các ván Người vs Bot và Bot vs Bot; giải Xếp hạng AI không làm thay đổi Elo. Elo là điểm ước lượng sức chơi tương đối, bắt đầu ở 1200 theo cấu hình mặc định. Thắng làm điểm tăng nhiều hơn khi đối thủ mạnh hơn, còn thua làm điểm giảm; hòa thường chỉ điều chỉnh nhẹ. Nút **Đặt lại** yêu cầu xác nhận trước khi xóa dữ liệu xếp hạng.
 
 ## Cài đặt
 

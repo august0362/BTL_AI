@@ -58,7 +58,7 @@ class App:
             self.data_dir / "ranking.json",
             elo_initial=ranking_cfg.get("elo_initial", 1200),
             elo_k=ranking_cfg.get("elo_k", 32),
-            known_ids=registry.list_bots(include_baseline=True) + ["human"],
+            known_ids=registry.list_bots(include_benchmarks=True) + ["human"],
         )
         self.history = History(self.data_dir / "history", history_cfg.get("max_games", 20))
         self.tournament_settings = TournamentConfig.from_config(self.config)

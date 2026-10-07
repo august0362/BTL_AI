@@ -7,7 +7,7 @@ from tournament.tournament_config import TournamentConfig
 
 def test_defaults_when_the_table_is_missing():
     settings = TournamentConfig.from_config({})
-    assert len(settings.bots) == 8
+    assert len(settings.bots) == 9
     assert "bench_random" in settings.bots
     assert settings.matches_per_pair == 20
     assert settings.max_history == 10
@@ -58,7 +58,7 @@ def test_bad_values_fall_back_instead_of_crashing():
             }
         }
     )
-    assert len(settings.bots) == 8
+    assert len(settings.bots) == 9
     assert settings.matches_per_pair == 20
     assert settings.max_plies == 1
     assert settings.depth == 0
@@ -67,8 +67,8 @@ def test_bad_values_fall_back_instead_of_crashing():
 
 def test_duplicate_bots_fall_back_to_the_default_list():
     settings = TournamentConfig.from_config({"tournament": {"bots": ["mcts", "mcts", "deep_rl"]}})
-    assert len(settings.bots) == 8
-    assert len(set(settings.bots)) == 8
+    assert len(settings.bots) == 9
+    assert len(set(settings.bots)) == 9
 
 
 def test_negative_time_limit_means_no_limit():

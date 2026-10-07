@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import time
 from collections.abc import Callable
 from typing import NamedTuple
@@ -18,6 +19,11 @@ LOWERBOUND = 1
 UPPERBOUND = 2
 
 DEFAULT_TT_ENTRIES = 300_000
+MAX_QUIESCENCE_PLIES = 8
+NULL_MOVE_REDUCTION = 2
+LMR_MIN_DEPTH = 3
+LMR_FIRST_MOVES = 3
+MAX_CHECK_EXTENSIONS = 2
 DEADLINE_CHECK_INTERVAL = 1024
 
 
@@ -141,13 +147,21 @@ def alpha_beta_iterative(
     tt: TranspositionTable | None = None,
     killers: dict[int, chess.Move] | None = None,
     time_limit_s: float | None = None,
+    rng: random.Random | None = None,
+    quiescence: bool = False,
+    pruning: bool = False,
+    extend_checks: bool = False,
 ) -> SearchResult:
     """Deepen 1..max_depth and stop early once the per-move time budget is spent.
 
     ``time_limit_s`` is a wall-clock budget in seconds; ``None`` (or <= 0) means
     no limit and the search always reaches ``max_depth``. When the budget runs
     out mid-iteration the partial result is discarded and the best move of the
-    last completed depth is returned, so a move is always produced.
+    last completed depth is returned, so a move is always produced. With ``rng`` the
+    root picks randomly among equally scored best moves (integer-valued evaluators).
+    With ``quiescence`` leaf nodes keep searching captures until the position is quiet.
+    With ``pruning`` interior nodes use null-move pruning and late move reductions.
+    With ``extend_checks`` a side in check is searched one ply deeper (bounded).
     """
     limit = None if time_limit_s is None or time_limit_s <= 0 else float(time_limit_s)
     if board.is_game_over():
@@ -158,7 +172,18 @@ def alpha_beta_iterative(
     nodes = 0
     for depth in range(1, max(1, int(max_depth)) + 1):
         try:
-            result = _root(board, depth, evaluator, tt=tt, killers=killers, deadline=deadline)
+            result = _root(
+                board,
+                depth,
+                evaluator,
+                tt=tt,
+                killers=killers,
+                deadline=deadline,
+                rng=rng,
+                quiescence=quiescence,
+                pruning=pruning,
+                extend_checks=extend_checks,
+            )
         except SearchTimeout:
             break
         nodes += result.nodes
@@ -179,6 +204,10 @@ def _root(
     tt: TranspositionTable | None,
     killers: dict[int, chess.Move] | None,
     deadline: float | None = None,
+    rng: random.Random | None = None,
+    quiescence: bool = False,
+    pruning: bool = False,
+    extend_checks: bool = False,
 ) -> SearchResult:
     counter = _NodeCounter()
     if board.is_game_over():
@@ -199,18 +228,37 @@ def _root(
     best_move = None
     best_score = float("-inf")
     alpha = float("-inf")
+    # With rng, widen the window by 1 so moves tying the best score get exact values.
+    margin = 1.0 if rng is not None else 0.0
+    ties: list[chess.Move] = []
     for move in moves:
         board.push(move)
         try:
             score = -_negamax(
-                board, depth - 1, float("-inf"), -alpha, evaluator, counter, tt, killers, deadline
+                board,
+                depth - 1,
+                float("-inf"),
+                -(alpha - margin),
+                evaluator,
+                counter,
+                tt,
+                killers,
+                deadline,
+                quiescence,
+                pruning,
+                MAX_CHECK_EXTENSIONS if extend_checks else 0,
             )
         finally:
             board.pop()
         if score > best_score:
             best_move, best_score = move, score
+            ties = [move]
+        elif score == best_score:
+            ties.append(move)
         if score > alpha:
             alpha = score
+    if rng is not None and len(ties) > 1:
+        best_move = rng.choice(ties)
 
     if tt is not None:
         tt.store(zobrist_hash(board), depth, best_score, EXACT, best_move)
@@ -227,6 +275,9 @@ def _negamax(
     tt: TranspositionTable | None,
     killers: dict[int, chess.Move] | None,
     deadline: float | None = None,
+    quiescence: bool = False,
+    pruning: bool = False,
+    extensions: int = 0,
 ) -> float:
     counter.value += 1
     if (
@@ -235,7 +286,14 @@ def _negamax(
         and time.perf_counter() >= deadline
     ):
         raise SearchTimeout
-    if depth <= 0 or board.is_game_over():
+    in_check = board.is_check()
+    if in_check and extensions > 0:
+        # Check extension: never stop the search while the side to move is in check.
+        depth += 1
+        extensions -= 1
+    if depth <= 0:
+        if quiescence:
+            return _quiesce(board, alpha, beta, evaluator, counter, deadline, 0)
         return evaluator(board)
 
     alpha_origin, beta_origin = alpha, beta
@@ -257,21 +315,64 @@ def _negamax(
                 if alpha >= beta:
                     return entry_score
 
+    def child(move_depth: int, low: float, high: float) -> float:
+        return -_negamax(
+            board,
+            move_depth,
+            -high,
+            -low,
+            evaluator,
+            counter,
+            tt,
+            killers,
+            deadline,
+            quiescence,
+            pruning,
+            extensions,
+        )
+
+    if pruning and depth >= LMR_MIN_DEPTH and not in_check and beta < float("inf"):
+        # Null move: if passing still beats beta, a real move will too (skip with pawns only).
+        own = board.occupied_co[board.turn] & ~board.pawns & ~board.kings
+        if own:
+            board.push(chess.Move.null())
+            try:
+                value = child(depth - 1 - NULL_MOVE_REDUCTION, beta - 1, beta)
+            finally:
+                board.pop()
+            if value >= beta:
+                return value
+
     killer = killers.get(board.ply()) if killers is not None else None
     moves = (
         order_moves(board, tt_move=tt_move, killer=killer)
         if tt is not None
         else list(board.legal_moves)
     )
+    if not moves:
+        return evaluator(board)  # checkmate or stalemate
 
     best = float("-inf")
     best_move = None
-    for move in moves:
+    for index, move in enumerate(moves):
+        reduce = (
+            pruning
+            and depth >= LMR_MIN_DEPTH
+            and index >= LMR_FIRST_MOVES
+            and not in_check
+            and move.promotion is None
+            and not board.is_capture(move)
+            and not board.gives_check(move)
+        )
         board.push(move)
         try:
-            value = -_negamax(
-                board, depth - 1, -beta, -alpha, evaluator, counter, tt, killers, deadline
-            )
+            if reduce:
+                # Late quiet moves are searched one ply shallower; re-search if they surprise.
+                value = child(depth - 2, alpha, alpha + 1)
+                if value > alpha:
+                    value = child(depth - 1, alpha, beta)
+            else:
+                value = child(depth - 1, alpha, beta)
         finally:
             board.pop()
         if value > best:
@@ -291,6 +392,46 @@ def _negamax(
         else:
             flag = EXACT
         tt.store(key, depth, best, flag, best_move)
+    return best
+
+
+def _quiesce(
+    board: chess.Board,
+    alpha: float,
+    beta: float,
+    evaluator: Evaluator,
+    counter: _NodeCounter,
+    deadline: float | None,
+    ply: int,
+) -> float:
+    """Search captures only (MVV-LVA order) until the position is quiet."""
+    counter.value += 1
+    if (
+        deadline is not None
+        and counter.value % DEADLINE_CHECK_INTERVAL == 0
+        and time.perf_counter() >= deadline
+    ):
+        raise SearchTimeout
+    stand_pat = evaluator(board)
+    if stand_pat >= beta or ply >= MAX_QUIESCENCE_PLIES:
+        return stand_pat
+    best = stand_pat
+    alpha = max(alpha, stand_pat)
+    captures = sorted(
+        board.generate_legal_captures(), key=lambda move: -move_order_score(move, board)
+    )
+    for move in captures:
+        board.push(move)
+        try:
+            score = -_quiesce(board, -beta, -alpha, evaluator, counter, deadline, ply + 1)
+        finally:
+            board.pop()
+        if score > best:
+            best = score
+        if score > alpha:
+            alpha = score
+        if alpha >= beta:
+            break
     return best
 
 

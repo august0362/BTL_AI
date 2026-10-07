@@ -261,3 +261,13 @@ def test_zero_depth_does_not_override_participants():
     runner.play()
     assert seen
     assert all("depth" not in config for config in seen)
+
+
+def test_total_adds_the_time_bonus_against_the_field_average():
+    # Example from the spec: 400 s against a 200 s average costs 2 points.
+    matchups = [Matchup("a", "b", games=2, wins_a=1, wins_b=1, score_a=1.0, score_b=1.0)]
+    standings = compute_standings(["a", "b"], matchups, {"a": 400.0, "b": 0.0})
+    totals = {row.bot_id: row.total for row in standings}
+    assert totals == {"a": 1.0 - 2.0, "b": 1.0 + 2.0}
+    assert [row.bot_id for row in standings] == ["b", "a"]
+    assert [row.points for row in standings] == [1.0, 1.0]
