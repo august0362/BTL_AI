@@ -61,3 +61,5 @@ test.sh
 
 DEEP_RL_DESIGN.md
 RL_LEARNING_GUIDE.md
+# ---------- Bản Android cá nhân (build bằng Buildozer, KHÔNG commit) ----------
+android/

@@ -202,3 +202,30 @@ def test_changing_bot_move_delay_interrupts_active_wait():
     c.set_bot_move_delay(0)
     assert c.join(3), "setting delay to zero should release an active wait"
     assert c.snapshot().finished
+
+
+def test_series_snapshot_tracks_seating_and_thinking_side():
+    """Best of 3 swaps colours in game 2; the thinking bot is the side to move."""
+    seen = []
+
+    class Recorder(FoolsMatePlayer):
+        def select_move(self, board):
+            snap = holder["controller"].snapshot()
+            seen.append((self.bot_id, board.turn, snap.thinking_color, snap.first_is_white))
+            return super().select_move(board)
+
+    holder = {}
+    a, b = Recorder("A"), Recorder("B")
+    cfg = {**CONFIG, "game": {**CONFIG["game"], "random_opening_plies": 0}}
+    c = controller.GameController(
+        a, b, mode="bot_vs_bot", config=cfg, n_games=3, rng=random.Random(1)
+    )
+    holder["controller"] = c
+    c.start()
+    assert c.join(10)
+    assert seen
+    for bot_id, turn, thinking_color, first_is_white in seen:
+        assert thinking_color == turn
+        assert first_is_white == ((bot_id == "A") == (turn == chess.WHITE))
+    second_game = [row for row in seen if row[0] == "A"][2:4]  # A's moves in game 2
+    assert all(not first_is_white for *_, first_is_white in second_game)

@@ -19,6 +19,9 @@ class BaseBot(ABC):
     def __init__(self, config: dict | None = None) -> None:
         self.config = config or {}
         self.last_search_info: dict = {}
+        name = self.config.get("display_name")
+        if isinstance(name, str) and name.strip():
+            self.display_name = name.strip()  # "[bots.<id>] display_name" in the config
 
     @abstractmethod
     def select_move(self, board: chess.Board) -> chess.Move:

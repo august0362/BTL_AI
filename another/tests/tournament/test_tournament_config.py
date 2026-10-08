@@ -7,7 +7,7 @@ from tournament.tournament_config import TournamentConfig
 
 def test_defaults_when_the_table_is_missing():
     settings = TournamentConfig.from_config({})
-    assert len(settings.bots) == 9
+    assert len(settings.bots) == 20
     assert "bench_random" in settings.bots
     assert settings.matches_per_pair == 20
     assert settings.max_history == 10
@@ -58,7 +58,7 @@ def test_bad_values_fall_back_instead_of_crashing():
             }
         }
     )
-    assert len(settings.bots) == 9
+    assert len(settings.bots) == 20
     assert settings.matches_per_pair == 20
     assert settings.max_plies == 1
     assert settings.depth == 0
@@ -67,8 +67,8 @@ def test_bad_values_fall_back_instead_of_crashing():
 
 def test_duplicate_bots_fall_back_to_the_default_list():
     settings = TournamentConfig.from_config({"tournament": {"bots": ["mcts", "mcts", "deep_rl"]}})
-    assert len(settings.bots) == 9
-    assert len(set(settings.bots)) == 9
+    assert len(settings.bots) == 20
+    assert len(set(settings.bots)) == 20
 
 
 def test_negative_time_limit_means_no_limit():
@@ -96,3 +96,15 @@ def test_validate_rejects_bad_settings(settings):
 
 def test_validate_accepts_zero_depth_and_zero_time_limit():
     TournamentConfig(bots=("a", "b"), depth=0, max_think_time_s=0.0).validate()
+
+
+def test_benchmark_level_limits_the_lineup():
+    settings = TournamentConfig.from_config(
+        {
+            "benchmarks": {"max_level": 5},
+            "tournament": {"bots": ["mcts", "bench_alphabeta_custom", "bench5_gpt", "bench7"]},
+        }
+    )
+    assert settings.bots == ("mcts", "bench_alphabeta_custom", "bench5_gpt")
+    default = TournamentConfig.from_config({"benchmarks": {"max_level": 4}})
+    assert not any(bot.startswith(("bench5", "bench6", "bench7")) for bot in default.bots)

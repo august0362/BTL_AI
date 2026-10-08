@@ -14,7 +14,9 @@ from itertools import combinations
 import chess
 
 from core.types import Termination
+from tournament.eta import DEFAULT_SMOOTHING, GameTimeEstimator
 from tournament.match_runner import MatchRunner
+from tournament.process_player import ProcessPlayer
 from tournament.records import GameRecord
 
 POINTS_WIN = 1.0
@@ -85,6 +87,15 @@ class Matchup:
 
 
 TIME_POINT_SECONDS = 100.0  # 100 s of thinking away from the average = 1 point
+MEMORY_POINT_MB = 100.0  # 100 MB of memory away from the average = 1 point
+# Upset bonus, settled per pair from the expected scores ``sum_e`` (game points plus the
+# time and memory terms, without any bonus) and their gap = sum_e(higher) - sum_e(lower).
+# Only the lower bot earns it: (12 % + 0.5 % * n) * gap if the higher bot lost n games to it,
+# plus (6 % + 0.05 % * d) * gap for d draws. Shown provisionally while the tournament runs.
+UPSET_WIN_SHARE = 0.12
+UPSET_WIN_STEP = 0.005
+UPSET_DRAW_SHARE = 0.06
+UPSET_DRAW_STEP = 0.0005
 
 
 @dataclass(frozen=True)
@@ -100,7 +111,9 @@ class StandingRow:
     losses: int
     think_time_s: float
     score_pct: float
-    total: float = 0.0  # points + (average thinking time - own time) / 100
+    total: float = 0.0  # points + (avg time - own time) / 100 + (avg MB - own MB) / 100
+    bonus: float = 0.0  # upset bonus, part of ``total`` (``points`` are game points only)
+    memory_mb: float = 0.0  # average peak memory per game in MB (0 = not measured)
 
     def to_json(self) -> dict:
         """Return a JSON-compatible representation."""
@@ -115,6 +128,8 @@ class StandingRow:
             "think_time_s": self.think_time_s,
             "score_pct": self.score_pct,
             "total": self.total,
+            "bonus": self.bonus,
+            "memory_mb": self.memory_mb,
         }
 
     @classmethod
@@ -131,6 +146,8 @@ class StandingRow:
             think_time_s=float(data["think_time_s"]),
             score_pct=float(data["score_pct"]),
             total=float(data.get("total", data["points"])),
+            bonus=float(data.get("bonus", 0.0)),
+            memory_mb=float(data.get("memory_mb", 0.0)),
         )
 
 
@@ -185,6 +202,7 @@ class TournamentResult:
                 tuple(data["participants"]),
                 matchups,
                 {row.bot_id: row.think_time_s for row in standings},
+                {row.bot_id: row.memory_mb for row in standings},
             )
         return cls(
             tournament_id=data["tournament_id"],
@@ -200,15 +218,43 @@ class TournamentResult:
         )
 
 
+def upset_bonuses(expected: Mapping[str, float], matchups: Iterable[Matchup]) -> dict[str, float]:
+    """Upset bonus per bot from each pair's results and the gap of expected scores ``sum_e``.
+
+    Only the bot with the lower sum_e earns it: ``(12 % + 0.5 % * n) * gap`` when the higher
+    bot lost n games to it, plus ``(6 % + 0.05 % * d) * gap`` for d draws. Equal sum_e: none.
+    """
+    bonus = {bot_id: 0.0 for bot_id in expected}
+    for matchup in matchups:
+        a, b = matchup.bot_a, matchup.bot_b
+        if a not in expected or b not in expected or expected[a] == expected[b]:
+            continue
+        if expected[a] > expected[b]:
+            low, upsets = b, matchup.wins_b
+        else:
+            low, upsets = a, matchup.wins_a
+        gap = abs(expected[a] - expected[b])
+        if upsets:
+            bonus[low] += (UPSET_WIN_SHARE + UPSET_WIN_STEP * upsets) * gap
+        if matchup.draws:
+            bonus[low] += (UPSET_DRAW_SHARE + UPSET_DRAW_STEP * matchup.draws) * gap
+    return bonus
+
+
 def compute_standings(
     participants: Sequence[str],
     matchups: Iterable[Matchup],
     think_times: Mapping[str, float] | None = None,
+    memories_mb: Mapping[str, float] | None = None,
 ) -> tuple[StandingRow, ...]:
-    """Rank bots by total = points + (average time - own time) / TIME_POINT_SECONDS.
+    """Rank bots by total = points + (average time - own time) / TIME_POINT_SECONDS
+    + (average memory - own memory) / MEMORY_POINT_MB.
 
-    Thinking less than the field average earns a bonus, more costs points; ties on the
-    total are broken by the lower thinking time.
+    ``points`` are game points only; the upset bonus (``upset_bonuses``) goes into the total.
+    Thinking less,
+    or using less
+    memory (MB per game), than the field average earns a bonus, more costs points; ties on
+    the total are broken by the lower thinking time.
     """
     wins = {bot_id: 0 for bot_id in participants}
     draws = {bot_id: 0 for bot_id in participants}
@@ -216,7 +262,8 @@ def compute_standings(
     games = {bot_id: 0 for bot_id in participants}
     points = {bot_id: 0.0 for bot_id in participants}
 
-    for matchup in matchups:
+    matchups_list = list(matchups)
+    for matchup in matchups_list:
         for bot_id, own_wins, own_losses, own_draws, score in (
             (matchup.bot_a, matchup.wins_a, matchup.wins_b, matchup.draws, matchup.score_a),
             (matchup.bot_b, matchup.wins_b, matchup.wins_a, matchup.draws, matchup.score_b),
@@ -229,16 +276,28 @@ def compute_standings(
             games[bot_id] += own_wins + own_losses + own_draws
             points[bot_id] += score
 
+    game_points = dict(points)
     times = dict(think_times or {})
+    # Averages over the bots that have played: during the tournament the time and memory
+    # parts are provisional; the final table recomputes them over the whole field.
+    played_ids = [bot_id for bot_id in participants if games[bot_id]] or list(participants)
     average = (
-        sum(times.get(bot_id, 0.0) for bot_id in participants) / len(participants)
-        if participants
+        sum(times.get(bot_id, 0.0) for bot_id in played_ids) / len(played_ids)
+        if played_ids
         else 0.0
     )
-    totals = {
-        bot_id: points[bot_id] + (average - times.get(bot_id, 0.0)) / TIME_POINT_SECONDS
+    memory = {bot_id: float((memories_mb or {}).get(bot_id, 0.0)) for bot_id in participants}
+    average_memory = (
+        sum(memory[bot_id] for bot_id in played_ids) / len(played_ids) if played_ids else 0.0
+    )
+    expected = {
+        bot_id: game_points[bot_id]
+        + (average - times.get(bot_id, 0.0)) / TIME_POINT_SECONDS
+        + (average_memory - memory[bot_id]) / MEMORY_POINT_MB
         for bot_id in participants
     }
+    bonus = upset_bonuses(expected, matchups_list)
+    totals = {bot_id: expected[bot_id] + bonus[bot_id] for bot_id in participants}
 
     def strength(bot_id: str) -> tuple[float, float]:
         """Smaller is better: higher total first, then less total thinking time."""
@@ -258,21 +317,28 @@ def compute_standings(
             StandingRow(
                 bot_id=bot_id,
                 rank=rank,
-                points=points[bot_id],
+                points=game_points[bot_id],
                 games=played,
                 wins=wins[bot_id],
                 draws=draws[bot_id],
                 losses=losses[bot_id],
                 think_time_s=times.get(bot_id, 0.0),
-                score_pct=(points[bot_id] / played) if played else 0.0,
+                score_pct=(game_points[bot_id] / played) if played else 0.0,
                 total=totals[bot_id],
+                bonus=bonus[bot_id],
+                memory_mb=memory[bot_id],
             )
         )
     return tuple(rows)
 
 
 class RoundRobinRunner:
-    """Play every unordered pair of bots, balancing colors as evenly as possible."""
+    """Challenge rounds: each bot in turn challenges every other bot and plays White.
+
+    With bots A, B, C: A challenges B and C (A is White), then B challenges A and C (B is
+    White), then C challenges A and B. ``matches_per_pair`` is the number of games of one
+    challenge, so every pair plays ``2 * matches_per_pair`` games, half with each colour.
+    """
 
     def __init__(
         self,
@@ -292,6 +358,8 @@ class RoundRobinRunner:
         on_game_end: Callable[[GameRecord], None] | None = None,
         clock: Callable[[], float] = time.perf_counter,
         create_bot: Callable[..., object] | None = None,
+        measure_memory: bool = False,
+        eta_smoothing: float = DEFAULT_SMOOTHING,
     ) -> None:
         participants = tuple(participant_ids)
         if len(participants) < 2:
@@ -309,7 +377,8 @@ class RoundRobinRunner:
         self.max_think_time_s = max_think_time_s
         self.eval_scale = eval_scale
         self.pairs: tuple[tuple[str, str], ...] = tuple(combinations(participants, 2))
-        self.games_total = len(self.pairs) * matches_per_pair
+        self.schedule: tuple[tuple[tuple[str, str], bool], ...] = tuple(self._schedule())
+        self.games_total = len(self.schedule)
         self._bot_configs = {key: dict(value) for key, value in (bot_configs or {}).items()}
         self._rng = random.Random(seed)
         self._on_progress = on_progress
@@ -317,6 +386,8 @@ class RoundRobinRunner:
         self._on_game_end = on_game_end
         self._clock = clock
         self._create_bot = create_bot or _registry_create_bot
+        # Each bot runs in its own process per game so the OS can measure its memory.
+        self._measure_memory = measure_memory and create_bot is None
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._current_runner: MatchRunner | None = None
@@ -326,6 +397,13 @@ class RoundRobinRunner:
             pair: Matchup(pair[0], pair[1]) for pair in self.pairs
         }
         self._think: dict[str, float] = {bot_id: 0.0 for bot_id in participants}
+        self._memory: dict[str, list[int]] = {bot_id: [] for bot_id in participants}
+        self._current_game: tuple[str, str] | None = None
+        # Estimated remaining time (exponential smoothing per bot, see tournament/eta.py).
+        self._estimator = GameTimeEstimator(eta_smoothing)
+        self._index = 0  # position of the current (or next) game in the schedule
+        self._started_at: float | None = None
+        self._game_started_at: float | None = None
         self._errors: list[str] = []
 
     @property
@@ -341,6 +419,26 @@ class RoundRobinRunner:
             return self._current_pair
 
     @property
+    def current_game(self) -> tuple[str, str] | None:
+        """Return (challenger/White, challenged/Black) of the game being played, if any."""
+        with self._lock:
+            return self._current_game
+
+    def time_status(self) -> tuple[float, float | None]:
+        """Return (elapsed seconds, estimated seconds left or None while unknown)."""
+        now = self._clock()
+        with self._lock:
+            if self._started_at is None:
+                return 0.0, None
+            elapsed = now - self._started_at
+            running = 0.0 if self._game_started_at is None else now - self._game_started_at
+            games = [
+                (pair[0], pair[1]) if a_is_white else (pair[1], pair[0])
+                for pair, a_is_white in self.schedule[self._index :]
+            ]
+            return elapsed, self._estimator.remaining_seconds(games, running)
+
+    @property
     def errors(self) -> tuple[str, ...]:
         """Return messages collected from aborted games."""
         with self._lock:
@@ -350,7 +448,10 @@ class RoundRobinRunner:
         """Return live standings computed from the games finished so far."""
         with self._lock:
             return compute_standings(
-                self.participants, list(self._matchups.values()), dict(self._think)
+                self.participants,
+                list(self._matchups.values()),
+                dict(self._think),
+                self._memory_mb(),
             )
 
     def request_stop(self) -> None:
@@ -365,28 +466,33 @@ class RoundRobinRunner:
         """Play the whole schedule and return the final standings."""
         created_at = datetime.now(UTC).isoformat()
         completed = True
-        for pair_index, pair in enumerate(self.pairs):
+        with self._lock:
+            self._started_at = self._clock()
+        for index, (pair, a_is_white) in enumerate(self.schedule):
             if self._stop.is_set():
                 completed = False
                 break
-            for a_is_white in self._colors(pair_index):
-                if self._stop.is_set():
-                    completed = False
-                    break
-                with self._lock:
-                    self._current_pair = pair
-                self._play_game(pair, a_is_white)
-                with self._lock:
-                    self._played += 1
-                if self._on_progress is not None:
-                    self._on_progress(self.played, self.games_total, pair)
-            if not completed:
-                break
+            with self._lock:
+                self._current_pair = pair
+                self._index = index
+                self._game_started_at = self._clock()
+            self._play_game(pair, a_is_white)
+            with self._lock:
+                self._played += 1
+            if self._on_progress is not None:
+                self._on_progress(self.played, self.games_total, pair)
         with self._lock:
             self._current_pair = None
+            self._index = len(self.schedule)
+            self._game_started_at = None
             matchups = tuple(self._matchups.values())
             played = self._played
-            standings = compute_standings(self.participants, matchups, dict(self._think))
+            standings = compute_standings(
+                self.participants,
+                matchups,
+                dict(self._think),
+                self._memory_mb(),
+            )
             errors = tuple(self._errors)
         return TournamentResult(
             tournament_id=uuid.uuid4().hex,
@@ -401,12 +507,20 @@ class RoundRobinRunner:
             errors=errors,
         )
 
-    def _colors(self, pair_index: int) -> list[bool]:
-        """Return whether bot A has White in each game of the pair."""
-        colors = [True, False] * (self.matches_per_pair // 2)
-        if self.matches_per_pair % 2:
-            colors.append(pair_index % 2 == 0)
-        return colors
+    def _schedule(self):
+        """Yield (pair, pair[0] is White) game by game, challenger by challenger."""
+        order = {bot_id: index for index, bot_id in enumerate(self.participants)}
+        for challenger in self.participants:
+            for opponent in self.participants:
+                if opponent == challenger:
+                    continue
+                pair = (
+                    (challenger, opponent)
+                    if order[challenger] < order[opponent]
+                    else (opponent, challenger)
+                )
+                for _ in range(self.matches_per_pair):
+                    yield pair, pair[0] == challenger
 
     def _bot_config(self, bot_id: str) -> dict:
         config = dict(self._bot_configs.get(bot_id, {}))
@@ -424,12 +538,15 @@ class RoundRobinRunner:
     def _play_game(self, pair: tuple[str, str], a_is_white: bool) -> None:
         bot_a, bot_b = pair
         white_id, black_id = (bot_a, bot_b) if a_is_white else (bot_b, bot_a)
+        create = ProcessPlayer if self._measure_memory else self._create_bot
+        white = black = None
         try:
-            white = self._create_bot(white_id, self._bot_config(white_id))
-            black = self._create_bot(black_id, self._bot_config(black_id))
+            white = create(white_id, self._bot_config(white_id))
+            black = create(black_id, self._bot_config(black_id))
         except Exception as exc:  # noqa: BLE001 - one broken bot must not stop the tournament
             with self._lock:
                 self._errors.append(f"{white_id} vs {black_id}: {exc}")
+            self._close_players((white_id, white), (black_id, black))
             return
         runner = MatchRunner(
             white,
@@ -444,18 +561,58 @@ class RoundRobinRunner:
         )
         with self._lock:
             self._current_runner = runner
+            self._current_game = (white_id, black_id)
             if self._stop.is_set():
                 runner.request_stop()
-        record = runner.play()
+        try:
+            record = runner.play()
+        finally:
+            # One process per bot per game: close both and collect their peak memory.
+            measured = self._close_players((white_id, white), (black_id, black))
         with self._lock:
             self._current_runner = None
+            self._current_game = None
             if record.result.termination is not Termination.ABORTED:
+                for bot_id, used in measured:
+                    self._memory[bot_id].append(used)
                 self._matchups[pair].add(record.result.winner, a_is_white)
                 self._add_think_time(record)
+                self._update_estimate(record)
             elif record.error:
                 self._errors.append(record.error)
         if self._on_game_end is not None:
             self._on_game_end(record)
+
+    @staticmethod
+    def _close_players(*players: tuple[str, object]) -> list[tuple[str, int]]:
+        """Stop the bot processes (if any); return (bot_id, peak memory in bytes)."""
+        measured = []
+        for bot_id, player in players:
+            if isinstance(player, ProcessPlayer):
+                used = player.close()
+                if used is not None:
+                    measured.append((bot_id, used))
+        return measured
+
+    def _memory_mb(self) -> dict[str, float]:
+        """Average peak memory per game in MB (0 for bots not measured)."""
+        return {
+            bot_id: (sum(values) / len(values) / 1_048_576) if values else 0.0
+            for bot_id, values in self._memory.items()
+        }
+
+    def _update_estimate(self, record: GameRecord) -> None:
+        """Feed the finished game's thinking times and wall time to the estimator."""
+        think = {record.white_id: 0.0, record.black_id: 0.0}
+        for move in record.moves:
+            if not move.is_random_opening:
+                bot_id = record.white_id if move.ply % 2 == 1 else record.black_id
+                think[bot_id] = think.get(bot_id, 0.0) + move.think_time_s
+        started = self._game_started_at
+        wall = 0.0 if started is None else self._clock() - started
+        self._estimator.update(
+            record.white_id, think[record.white_id], record.black_id, think[record.black_id], wall
+        )
 
     def _add_think_time(self, record: GameRecord) -> None:
         """Add each side's measured thinking time to its tournament total."""

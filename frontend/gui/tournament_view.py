@@ -22,6 +22,7 @@ class TournamentRow:
     points: float
     think_time_s: float
     total: float = 0.0
+    memory_mb: float = 0.0
 
 
 def tournament_rows(standings: Sequence[StandingRow], translator) -> list[TournamentRow]:
@@ -38,9 +39,33 @@ def tournament_rows(standings: Sequence[StandingRow], translator) -> list[Tourna
             points=row.points,
             think_time_s=row.think_time_s,
             total=row.total,
+            memory_mb=row.memory_mb,
         )
         for index, row in enumerate(standings)
     ]
+
+
+SORT_FIELDS = (
+    "games",
+    "wins",
+    "draws",
+    "losses",
+    "points",
+    "think_time_s",
+    "memory_mb",
+    "total",
+)
+DEFAULT_SORT = "total"
+
+
+def sort_rows(rows: Sequence[TournamentRow], field: str) -> list[TournamentRow]:
+    """Order rows by one column, highest first; ``total`` keeps the ranking order.
+
+    Ties keep the ranking order, so the rank column stays meaningful while sorted.
+    """
+    if field == DEFAULT_SORT or field not in SORT_FIELDS:
+        return list(rows)
+    return sorted(rows, key=lambda row: (-getattr(row, field), row.rank))
 
 
 def provisional_standings(bot_ids: Sequence[str]) -> tuple[StandingRow, ...]:
@@ -78,6 +103,19 @@ def format_total(total: float) -> str:
 def format_seconds(seconds: float) -> str:
     """Format a thinking-time total in seconds."""
     return f"{seconds:.1f}s"
+
+
+def format_memory(megabytes: float) -> str:
+    """Format the average peak memory per game; ``-`` when it was not measured."""
+    return f"{megabytes:.1f} MB" if megabytes > 0 else "-"
+
+
+def format_duration(seconds: float) -> str:
+    """Format a duration as ``h:mm:ss`` (or ``m:ss`` under an hour)."""
+    total = max(0, round(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
 
 
 def format_head_to_head(matchup: Matchup) -> str:

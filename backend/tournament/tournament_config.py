@@ -27,6 +27,8 @@ class TournamentConfig:
     claim_draw: bool = True
     seed: int = DEFAULT_SEED
     max_think_time_s: float = DEFAULT_MAX_THINK_TIME_S
+    measure_memory: bool = True  # run each bot in its own process; the OS measures its RAM
+    eta_smoothing: float = 0.3  # alpha of the smoothed game times behind the time estimate
 
     @classmethod
     def from_config(cls, config: dict) -> TournamentConfig:
@@ -36,11 +38,14 @@ class TournamentConfig:
             table = {}
         bots = table.get("bots")
         if isinstance(bots, list) and bots and all(isinstance(bot, str) for bot in bots):
-            bot_ids = tuple(bots)
+            from ai import registry
+
+            level = registry.benchmark_level(config)
+            bot_ids = tuple(bot for bot in bots if registry.benchmark_allowed(bot, level))
         else:
-            bot_ids = _default_bots()
+            bot_ids = _default_bots(config)
         if len(bot_ids) < 2 or len(set(bot_ids)) != len(bot_ids):
-            bot_ids = _default_bots()
+            bot_ids = _default_bots(config)
         return cls(
             bots=bot_ids,
             matches_per_pair=max(
@@ -57,6 +62,8 @@ class TournamentConfig:
             max_think_time_s=max(
                 0.0, _float_value(table, "max_think_time_s", DEFAULT_MAX_THINK_TIME_S)
             ),
+            measure_memory=bool(table.get("measure_memory", True)),
+            eta_smoothing=min(1.0, max(0.01, _float_value(table, "eta_smoothing", 0.3))),
         )
 
     def validate(self) -> None:
@@ -95,7 +102,11 @@ def _float_value(table: dict, key: str, default: float) -> float:
         return default
 
 
-def _default_bots() -> tuple[str, ...]:
+def _default_bots(config: dict | None = None) -> tuple[str, ...]:
     from ai import registry
 
-    return tuple(registry.list_bots(include_benchmarks=True))
+    return tuple(
+        registry.list_bots(
+            include_benchmarks=True, max_benchmark_level=registry.benchmark_level(config)
+        )
+    )

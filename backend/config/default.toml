@@ -32,28 +32,50 @@ scale = 8.0                # giá trị thanh = tanh(chênh lệch quân / scale
 
 # Mỗi bot có bảng [bots.<bot_id>]; nội dung được truyền vào BaseBot(config=...).
 [bots.random]
+# display_name = "Ngẫu nhiên (debug)"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
 
 [bots.alphabeta_regression]
+# display_name = "Alpha-Beta + Hồi quy"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
 
 [bots.genetic_alphabeta]
+# display_name = "Alpha-Beta + Genetic"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
 
 [bots.mcts]
+# display_name = "MCTS"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
 
 [bots.deep_rl]
+# display_name = "Deep RL"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
 weights_url = ""           # link asset trên GitHub Release
 weights_sha256 = ""
 device = "cpu"
 
+# ---------- Bot benchmark: bật/tắt theo thế hệ ----------
+[benchmarks]
+# Chỉ hiện các benchmark có số thế hệ <= max_level (ở Người vs Bot, Bot vs Bot, Elo, Xếp hạng AI).
+# 4 = Benchmark 1–4; 5 = thêm toàn bộ Benchmark 5; 6 = thêm Benchmark 6; 7 = thêm Benchmark 7; 8 = thêm Benchmark 8 …
+# (Benchmark 1.5 có số 1.5.) Xóa khóa này = hiện mọi benchmark.
+max_level = 4
+
 # ---------- Bảng xếp hạng AI (tournament) ----------
 [tournament]
-# Các bot tham gia vòng tròn. Mặc định: 4 bot thành viên + 4 bot benchmark.
+# Các bot tham gia vòng tròn. Mặc định: 4 bot thành viên + 16 bot benchmark.
 bots = [
     "alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl",
     "bench_random", "bench_alphabeta_material", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom",
+    "bench5_gpt", "bench5_gemini", "bench5_deepseek", "bench5_grok", "bench5_hybrid",
+    "bench6_gpt", "bench6_gemini", "bench6_grok", "bench6_deepseek", "bench7",
+    "bench8_luna",
 ]
-matches_per_pair = 6      # số ván mỗi cặp; chia đều Trắng/Đen
-max_history = 10           # số "Trận Chiến Lần n" lưu lại gần nhất
-max_plies = 300            # quá số nửa nước này thì xử hòa (tránh vờn nhau)
+matches_per_pair = 1      # số ván mỗi lượt thách đấu: lần lượt từng bot thách đấu mọi bot khác và cầm Trắng
+                          # (A thách B, C… rồi B thách A, C…) → mỗi cặp 2 × số này ván, đủ Trắng/Đen
+max_history = 15           # số "Trận Chiến Lần n" lưu lại gần nhất
+max_plies = 150            # quá số nửa nước này thì xử hòa (tránh vờn nhau)
+# true: mỗi ván, mỗi bot chạy trong 1 tiến trình riêng; hệ điều hành đo đỉnh RAM (gồm cả bộ nhớ
+# tạm lúc nghĩ) → cột Bộ nhớ = đỉnh RAM trung bình mỗi ván. Không làm bot chậm lại.
+measure_memory = true
+# Ước tính thời gian còn lại (góc phải màn Xếp hạng AI): làm mượt thời gian mỗi ván theo từng bot,
+# E_mới = a × lần đo vừa rồi + (1 − a) × E_cũ. a lớn = bám số mới nhanh, a nhỏ = ổn định hơn.
+eta_smoothing = 0.3
 # > 0: ép mọi bot tìm kiếm đúng độ sâu này (chậm hơn nếu bot của thành viên nặng).
 # 0: giữ độ sâu riêng của từng bot ([bots.<id>] hoặc mặc định của bot) — nhanh nhất.
 depth = 0
@@ -63,23 +85,79 @@ max_think_time_s = 1.0     # trần thời gian suy nghĩ mỗi nước (giây);
 seed = -1                  # -1 = ngẫu nhiên mỗi lần chạy; >= 0 để tái lập
 
 [bots.bench_random]
+display_name = "Benchmark 1 · Random"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 seed = -1
 
 [bots.bench_alphabeta_material]
+display_name = "Benchmark 1.5 · Alpha-Beta thuần"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 # Benchmark 1.5: alpha-beta thuần, điểm = tổng quân mình − tổng quân địch
 depth = 3
 
 [bots.bench_alphabeta3]
+display_name = "Benchmark 2 · Alpha-Beta 3"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 # Benchmark 2
 depth = 3
 evaluator = "pst"   
 
 [bots.bench_alphabeta_tt]
+display_name = "Benchmark 3 · Alpha-Beta TT"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 # Benchmark 3
 depth = 3
 evaluator = "pst"
 
 [bots.bench_alphabeta_custom]
-# Benchmark 4: độ sâu 3 + check extension; đặt 4 để bật null-move/LMR (mạnh hơn, ~0.3 s/nước)
+display_name = "Benchmark 4 · Alpha-Beta Custom"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+# Benchmark 4: độ sâu 3 + check extension + null-move/LMR (bật từ độ sâu còn lại >= 2)
 depth = 3
 evaluator = "advanced"
+
+# Benchmark 5: PVS dùng hết ngân sách thời gian (module ai.bench5).
+# max_think_time_s: giây mỗi nước (mặc định 1.0; 0 = không giới hạn, khi đó dừng ở độ sâu 5).
+# depth: chỉ đặt khi muốn chặn độ sâu tối đa.
+[bots.bench5_gpt]
+display_name = "Benchmark 5 · GPT"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench5_gemini]
+display_name = "Benchmark 5 · Gemini"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench5_deepseek]
+display_name = "Benchmark 5 · DeepSeek"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench5_grok]
+display_name = "Benchmark 5 · Grok"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench5_hybrid]
+display_name = "Benchmark 5 · Hybrid"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+# Benchmark 6 (4 profile, module ai.bench6) và Benchmark 7 (module ai.bench7): PVS chọn lọc.
+# Cùng quy ước với Benchmark 5: max_think_time_s mặc định 1.0; seed dùng cho sách khai cuộc.
+[bots.bench6_gpt]
+display_name = "Benchmark 6 · GPT"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench6_gemini]
+display_name = "Benchmark 6 · Gemini"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench6_grok]
+display_name = "Benchmark 6 · Grok"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench6_deepseek]
+display_name = "Benchmark 6 · DeepSeek"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+[bots.bench7]
+display_name = "Benchmark 7 · Dragon"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+
+# Benchmark 8 "Luna" (module ai.bench8): lõi Dragon + SEE nhanh; chưa vượt B7 (xem CONTEXT §4.9.3). Hiện khi max_level >= 8.
+[bots.bench8_luna]
+display_name = "Benchmark 8 · Luna"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0
+max_plies = 150   # số nửa nước tối đa của ván (như tournament.max_plies), dùng khi bật mốc hòa

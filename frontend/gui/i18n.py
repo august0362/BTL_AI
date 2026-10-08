@@ -32,10 +32,16 @@ def _flatten(values: dict[str, object], prefix: str = "") -> dict[str, str]:
 class Translator:
     """Load and serve strings from the selected locale TOML file."""
 
-    def __init__(self, language: str = "vi", directory: Path = LOCALES_DIR) -> None:
+    def __init__(
+        self,
+        language: str = "vi",
+        directory: Path = LOCALES_DIR,
+        overrides: dict[str, str] | None = None,
+    ) -> None:
         self._directory = Path(directory)
         self._language = "vi"
         self._strings: dict[str, str] = {}
+        self._overrides = dict(overrides or {})
         self.set_language(language)
 
     @property
@@ -53,8 +59,11 @@ class Translator:
         self._strings = strings
 
     def t(self, key: str, **params: object) -> str:
-        """Translate a dotted key and preserve any unresolved format fields."""
-        value = self._strings.get(key)
+        """Translate a dotted key and preserve any unresolved format fields.
+
+        ``overrides`` (e.g. bot names from ``[bots.<id>] display_name``) win in every language.
+        """
+        value = self._overrides.get(key) or self._strings.get(key)
         if value is None:
             return key
         return value.format_map(_MissingParams(params))

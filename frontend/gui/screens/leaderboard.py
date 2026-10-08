@@ -63,7 +63,9 @@ class LeaderboardScreen(Screen):
                 (x, 130),
             )
             x += width
-        for index, row in enumerate(leaderboard_rows(self.app.ranking, self.app.translator)[:11]):
+        rows = leaderboard_rows(self.app.ranking, self.app.translator)[:20]
+        row_step = 31 if len(rows) <= 11 else 26 if len(rows) <= 15 else 20
+        for index, row in enumerate(rows):
             vals = (
                 str(row.rank),
                 row.name,
@@ -77,7 +79,8 @@ class LeaderboardScreen(Screen):
             x = 70
             for value, width in zip(vals, widths, strict=True):
                 canvas.blit(
-                    font.render(value, True, self.app.theme.roles["text"]), (x, 165 + index * 31)
+                    font.render(value, True, self.app.theme.roles["text"]),
+                    (x, 165 + index * row_step),
                 )
                 x += width
         self.reset.draw(canvas, get_font(13))

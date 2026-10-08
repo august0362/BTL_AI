@@ -20,7 +20,7 @@ def app(tmp_path):
     config["ui"].update(show_debug_bots=True, bot_move_delay_ms=0)
     config["tournament"].update(
         bots=["bench_random", "bench_alphabeta3"],
-        matches_per_pair=2,
+        matches_per_pair=1,
         max_plies=6,
         depth=1,
         random_opening_plies=0,
@@ -56,6 +56,7 @@ def test_tournament_runs_in_background_and_is_saved(app):
     assert snapshot.result.completed is True
     assert snapshot.result.games_played == 2
     assert snapshot.result.battle == 1
+    # Game points (without the upset bonus) add up to one point per game.
     assert sum(row.points for row in snapshot.standings) == 2.0
 
     battles = app.tournament_history.list()
@@ -85,3 +86,21 @@ def test_stopping_a_tournament_keeps_the_history_untouched(app):
     assert snapshot.result is not None
     assert snapshot.result.completed is False
     assert app.tournament_history.list() == []
+
+
+def test_clicking_a_header_sorts_and_resets_after_five_seconds(app, monkeypatch):
+    import pygame
+
+    app.goto("tournament")
+    screen = app.screen
+    assert screen.sort_field == "total"
+    now = [1_000]
+    monkeypatch.setattr(pygame.time, "get_ticks", lambda: now[0])
+    rect = screen.header_rects()["wins"]
+    screen.handle_click(*rect.center)
+    assert screen.sort_field == "wins"
+    app.render_frame()
+    assert screen.sort_field == "wins"
+    now[0] += 5_000
+    app.render_frame()
+    assert screen.sort_field == "total"

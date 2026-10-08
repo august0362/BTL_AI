@@ -141,6 +141,10 @@ class MatchRunner:
                     error = f"{player.bot_id}: {exc}"
                     raise _PlayerFailure from exc
                 think_time = max(0.0, self.clock() - started)
+                # Players running in another process report their own clock (no IPC time).
+                measured = getattr(player, "measured_think_time_s", None)
+                if measured is not None:
+                    think_time = max(0.0, float(measured))
                 if self._stop_event.is_set():
                     raise MatchAborted
                 if not isinstance(move, chess.Move) or move not in state.legal_moves():

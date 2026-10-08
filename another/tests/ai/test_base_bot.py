@@ -44,3 +44,9 @@ def test_bot_unavailable_error():
     err = base.BotUnavailableError("thiếu trọng số")
     assert isinstance(err, Exception)
     assert "thiếu trọng số" in str(err)
+
+
+def test_display_name_can_come_from_the_config():
+    assert FirstMoveBot({"display_name": "  Dragon  "}).display_name == "Dragon"
+    assert FirstMoveBot({"display_name": ""}).display_name == "First"
+    assert FirstMoveBot().display_name == "First"

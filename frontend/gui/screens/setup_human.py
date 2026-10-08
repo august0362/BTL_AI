@@ -27,6 +27,7 @@ class SetupHumanScreen(Screen):
         self.bot_ids = registry.list_bots(
             include_debug=app.config.get("ui", {}).get("show_debug_bots", False),
             include_benchmarks=True,
+            max_benchmark_level=registry.benchmark_level(app.config),
         )
         self.available: dict[str, tuple[bool, str]] = {}
         for bot_id in self.bot_ids:
@@ -46,8 +47,19 @@ class SetupHumanScreen(Screen):
         self.color_index = 0
         self.bot_buttons: list[Button] = []
         self.reason_positions: list[tuple[int, int, str]] = []
-        row_start = 198
-        row_step = 50
+        # Two-column grid; more rows (14-15 bots: compact, 19-20 bots: dense) move the title
+        # up and tighten the rows so the colour and action rows keep their place.
+        rows = (len(self.bot_ids) + 1) // 2
+        if rows > 7:
+            self._title_y, self._label_y = 44, 70
+            row_start, row_step, button_height = 98, 36, 22
+        elif rows > 5:
+            self._title_y, self._label_y = 50, 78
+            row_start, row_step, button_height = 104, 44, 30
+        else:
+            self._title_y, self._label_y = 126, 175
+            row_start, row_step, button_height = 198, 50, 34
+        self._bot_font = 13 if rows > 7 else 15
         for index, bot_id in enumerate(self.bot_ids):
             enabled, reason = self.available[bot_id]
             column = index % 2
@@ -55,14 +67,14 @@ class SetupHumanScreen(Screen):
             x = 180 + column * 310
             self.bot_buttons.append(
                 Button(
-                    pygame.Rect(x, row_y, 290, 34),
+                    pygame.Rect(x, row_y, 290, button_height),
                     app._localized_bot_name(bot_id),
                     enabled=enabled,
                     selected=bot_id == self.selected_bot,
                 )
             )
             if not enabled:
-                self.reason_positions.append((x, row_y + 35, reason))
+                self.reason_positions.append((x, row_y + button_height + 1, reason))
         color_y = 487
         action_y = 566
         self.color_buttons = [
@@ -114,7 +126,7 @@ class SetupHumanScreen(Screen):
         title = get_font(28, bold=True).render(
             self.app.translator.t("setup.title_human"), True, self.app.theme.roles["text"]
         )
-        canvas.blit(title, title.get_rect(center=(480, 126)))
+        canvas.blit(title, title.get_rect(center=(480, self._title_y)))
         canvas.blit(
             render_fit(
                 get_font(16),
@@ -122,10 +134,10 @@ class SetupHumanScreen(Screen):
                 self.app.theme.roles["text_muted"],
                 300,
             ),
-            (330, 175),
+            (330, self._label_y),
         )
         for button in self.bot_buttons:
-            button.draw(canvas, get_font(15, bold=True))
+            button.draw(canvas, get_font(self._bot_font, bold=True))
         for x, y, reason in self.reason_positions:
             label = self.app.translator.t("setup.bot_unavailable", reason=reason)
             text = render_fit(get_font(10), label, self.app.theme.roles["text_muted"], 290)

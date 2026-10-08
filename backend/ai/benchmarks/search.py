@@ -21,7 +21,9 @@ UPPERBOUND = 2
 DEFAULT_TT_ENTRIES = 300_000
 MAX_QUIESCENCE_PLIES = 8
 NULL_MOVE_REDUCTION = 2
-LMR_MIN_DEPTH = 3
+# Remaining depth needed for null-move pruning and LMR; 2 keeps both active at the default depth 3.
+NULL_MOVE_MIN_DEPTH = 2
+LMR_MIN_DEPTH = 2
 LMR_FIRST_MOVES = 3
 MAX_CHECK_EXTENSIONS = 2
 DEADLINE_CHECK_INTERVAL = 1024
@@ -331,7 +333,7 @@ def _negamax(
             extensions,
         )
 
-    if pruning and depth >= LMR_MIN_DEPTH and not in_check and beta < float("inf"):
+    if pruning and depth >= NULL_MOVE_MIN_DEPTH and not in_check and beta < float("inf"):
         # Null move: if passing still beats beta, a real move will too (skip with pawns only).
         own = board.occupied_co[board.turn] & ~board.pawns & ~board.kings
         if own:

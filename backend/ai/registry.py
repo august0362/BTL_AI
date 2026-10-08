@@ -18,22 +18,71 @@ BENCHMARK_BOTS: dict[str, str] = {
     "bench_alphabeta3": "ai.benchmarks.bot:BenchmarkAlphaBetaBot",
     "bench_alphabeta_tt": "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
     "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",
+    # Each later generation is its own package, plugged in only here.
+    "bench5_gpt": "ai.bench5.bot:Benchmark5GptBot",
+    "bench5_gemini": "ai.bench5.bot:Benchmark5GeminiBot",
+    "bench5_deepseek": "ai.bench5.bot:Benchmark5DeepSeekBot",
+    "bench5_grok": "ai.bench5.bot:Benchmark5GrokBot",
+    "bench5_hybrid": "ai.bench5.bot:Benchmark5HybridBot",
+    "bench6_gpt": "ai.bench6.bot:Benchmark6GptBot",
+    "bench6_gemini": "ai.bench6.bot:Benchmark6GeminiBot",
+    "bench6_grok": "ai.bench6.bot:Benchmark6GrokBot",
+    "bench6_deepseek": "ai.bench6.bot:Benchmark6DeepSeekBot",
+    "bench7": "ai.bench7.bot:Benchmark7Bot",
+    "bench8_luna": "ai.bench8.bot:Benchmark8LunaBot",
 }
+# Benchmark generation of every benchmark bot; ``[benchmarks] max_level`` hides higher ones.
+BENCHMARK_LEVELS: dict[str, float] = {
+    "bench_random": 1,
+    "bench_alphabeta_material": 1.5,
+    "bench_alphabeta3": 2,
+    "bench_alphabeta_tt": 3,
+    "bench_alphabeta_custom": 4,
+    "bench5_gpt": 5,
+    "bench5_gemini": 5,
+    "bench5_deepseek": 5,
+    "bench5_grok": 5,
+    "bench5_hybrid": 5,
+    "bench6_gpt": 6,
+    "bench6_gemini": 6,
+    "bench6_grok": 6,
+    "bench6_deepseek": 6,
+    "bench7": 7,
+    "bench8_luna": 8,
+}
+
+
+def benchmark_level(config: dict | None) -> float | None:
+    """Read ``[benchmarks] max_level`` (None = no limit; invalid values = no limit)."""
+    table = (config or {}).get("benchmarks", {})
+    value = table.get("max_level") if isinstance(table, dict) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def benchmark_allowed(bot_id: str, max_level: float | None) -> bool:
+    """True unless ``bot_id`` is a benchmark above ``max_level``."""
+    level = BENCHMARK_LEVELS.get(bot_id)
+    return level is None or max_level is None or level <= max_level
 
 
 def list_bots(
     include_debug: bool = False,
     include_baseline: bool = False,
     include_benchmarks: bool = False,
+    max_benchmark_level: float | None = None,
 ) -> list[str]:
-    """Return registered bot ids in display order."""
+    """Return registered bot ids in display order (benchmarks up to ``max_benchmark_level``)."""
     bot_ids = list(BOT_REGISTRY)
     if include_debug:
         bot_ids.extend(DEBUG_BOTS)
     if include_baseline:
         bot_ids.extend(BASELINE_BOTS)
     if include_benchmarks:
-        bot_ids.extend(BENCHMARK_BOTS)
+        bot_ids.extend(
+            bot_id for bot_id in BENCHMARK_BOTS if benchmark_allowed(bot_id, max_benchmark_level)
+        )
     return bot_ids
 
 

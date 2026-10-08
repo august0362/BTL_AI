@@ -208,8 +208,14 @@ class GameScreen(Screen):
         bot_name = self.app.bot_display_name
         human_name = self.app.translator.t("players.human")
         if self.is_bot_game:
-            white_name = self.app._localized_bot_name(self.app.white_bot_id)
-            black_name = self.app._localized_bot_name(self.app.black_bot_id)
+            first_name = self.app._localized_bot_name(self.app.white_bot_id)
+            second_name = self.app._localized_bot_name(self.app.black_bot_id)
+            white_name, black_name = (
+                (first_name, second_name) if snapshot.first_is_white else (second_name, first_name)
+            )
+            # Name the bot whose turn it is, not always the one that started as White.
+            if snapshot.thinking_color is not None:
+                bot_name = white_name if snapshot.thinking_color == chess.WHITE else black_name
         else:
             white_name = human_name if self.app.human_color else bot_name
             black_name = bot_name if self.app.human_color else human_name
@@ -258,6 +264,8 @@ class GameScreen(Screen):
                     if series is not None
                     else self._series_scores(snapshot)
                 )
+                if not snapshot.first_is_white:
+                    score_a, score_b = score_b, score_a  # keep "White - Black" order
                 score = f"{score_a:g} - {score_b:g}"
                 info = self.app.translator.t(
                     "game.game_index", index=snapshot.game_index, total=snapshot.n_games
