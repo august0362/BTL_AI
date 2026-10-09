@@ -7,10 +7,10 @@ from dataclasses import replace
 import chess
 
 from ai import registry
-from ai.bench8.bot import Benchmark8LunaBot, resolve_ply_limit
-from ai.bench8.evaluation import Evaluator8
-from ai.bench8.profile import LUNA, TOURNAMENT_PLY_LIMIT
-from ai.bench8.search import Engine8, Verify8, see, see_ge
+from ai.benchmarks_extension.bench8.bot import Benchmark8LunaBot, resolve_ply_limit
+from ai.benchmarks_extension.bench8.evaluation import Evaluator8
+from ai.benchmarks_extension.bench8.profile import LUNA, TOURNAMENT_PLY_LIMIT
+from ai.benchmarks_extension.bench8.search import Engine8, Verify8, see, see_ge
 
 MATE_IN_ONE = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"
 MATE_IN_TWO = "r5k1/5ppp/8/8/8/8/4RPPP/4R1K1 w - - 0 1"  # 1.Re8+ Rxe8 2.Rxe8#

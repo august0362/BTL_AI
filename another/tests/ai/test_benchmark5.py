@@ -7,9 +7,9 @@ import chess
 import pytest
 
 from ai import registry
-from ai.bench5.evaluation import Evaluator5
-from ai.bench5.profiles import PROFILES
-from ai.bench5.search import see
+from ai.benchmarks_extension.bench5.evaluation import Evaluator5
+from ai.benchmarks_extension.bench5.profiles import PROFILES
+from ai.benchmarks_extension.bench5.search import see
 
 B5_IDS = ["bench5_gpt", "bench5_gemini", "bench5_deepseek", "bench5_grok", "bench5_hybrid"]
 MATE_IN_ONE = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"

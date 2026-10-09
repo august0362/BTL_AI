@@ -9,8 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.bench5.evaluation import EvalConfig, MopUp
-from ai.bench5.search import LmrConfig, NullMoveConfig, QuiescenceConfig, SearchConfig
+from ai.benchmarks_extension.bench5.evaluation import EvalConfig, MopUp
+from ai.benchmarks_extension.bench5.search import (
+    LmrConfig,
+    NullMoveConfig,
+    QuiescenceConfig,
+    SearchConfig,
+)
 
 FLAT_VALUES = (0, 100, 320, 330, 500, 900, 0)
 

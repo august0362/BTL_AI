@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.bench8.evaluation import EvalConfig8, MopUp8
-from ai.bench8.search import Lmr8, NullMove8, Quiescence8, SearchConfig8, TimeConfig8
+from ai.benchmarks_extension.bench8.evaluation import EvalConfig8, MopUp8
+from ai.benchmarks_extension.bench8.search import (
+    Lmr8,
+    NullMove8,
+    Quiescence8,
+    SearchConfig8,
+    TimeConfig8,
+)
 
 TOURNAMENT_PLY_LIMIT = 150  # the AI ranking draws a game after 150 plies
 

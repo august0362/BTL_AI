@@ -58,7 +58,7 @@ CI kiểm tra tự động (§9); vi phạm thì CI đỏ, không merge được
 ```text
 BTL_AI/
 ├── backend/
-│   ├── ai/            # bot, lớp nền, registry; benchmarks/ (B1–B4), bench5/ … bench8/ (mỗi thế hệ một package)
+│   ├── ai/            # bot, lớp nền, registry; benchmarks/ (B1–B4), benchmarks_extension/ (B5–B8: bench5/ … bench8/, mỗi thế hệ một package)
 │   ├── config/        # default.toml (commit) + local.toml (máy cá nhân)
 │   ├── core/          # trạng thái ván, kiểu dữ liệu
 │   └── tournament/    # trận đấu, lịch sử, xếp hạng
@@ -110,10 +110,10 @@ DEBUG_BOTS = {"random": "ai.random_bot.bot:RandomBot"}
 BENCHMARK_BOTS = {   # opt-in, xem §4.9
     "bench_random", "bench_alphabeta_material", "bench_alphabeta3", "bench_alphabeta_tt",
     "bench_alphabeta_custom",                       # ai.benchmarks.bot
-    "bench5_gpt|gemini|deepseek|grok|hybrid",       # ai.bench5.bot
-    "bench6_gpt|gemini|grok|deepseek",              # ai.bench6.bot
-    "bench7",                                       # ai.bench7.bot (Dragon)
-    "bench8_luna",                                  # ai.bench8.bot (Luna)
+    "bench5_gpt|gemini|deepseek|grok|hybrid",       # ai.benchmarks_extension.bench5.bot
+    "bench6_gpt|gemini|grok|deepseek",              # ai.benchmarks_extension.bench6.bot
+    "bench7",                                       # ai.benchmarks_extension.bench7.bot (Dragon)
+    "bench8_luna",                                  # ai.benchmarks_extension.bench8.bot (Luna)
 }
 BENCHMARK_LEVELS: dict[str, float]   # thế hệ: 1, 1.5, 2, 3, 4, 5, 6, 7, 8
 def benchmark_level(config) -> float | None: ...          # đọc [benchmarks] max_level
@@ -314,7 +314,7 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 
 ### 4.9 Xếp hạng AI — bot benchmark & giải vòng tròn
 
-**Bot benchmark** là thang phân loại sức mạnh, tách khỏi Elo (§4.7). B1–B4 ở `backend/ai/benchmarks/`; **mỗi thế hệ sau là một package riêng** (`bench5/` … `bench8/`), tự chứa engine, eval, bảng số, profile, lớp bot, không import package benchmark khác (import-linter kiểm), chỉ nối qua `ai.registry`. **Bật/tắt theo thế hệ:** `[benchmarks] max_level` (4 = B1–B4, 5 = +B5, 6 = +B6, 7 = +B7, 8 = +B8; xóa khóa = hiện tất cả; bot vượt mức bị loại cả khi có trong `tournament.bots`).
+**Bot benchmark** là thang phân loại sức mạnh, tách khỏi Elo (§4.7). B1–B4 ở `backend/ai/benchmarks/`; **mỗi thế hệ sau là một package riêng** (`backend/ai/benchmarks_extension/bench5/` … `bench8/`), tự chứa engine, eval, bảng số, profile, lớp bot, không import package benchmark khác (import-linter kiểm), chỉ nối qua `ai.registry`. **Bật/tắt theo thế hệ:** `[benchmarks] max_level` (4 = B1–B4, 5 = +B5, 6 = +B6, 7 = +B7, 8 = +B8; xóa khóa = hiện tất cả; bot vượt mức bị loại cả khi có trong `tournament.bots`).
 
 | id | Tên | Cách chơi |
 |---|---|---|
@@ -357,7 +357,7 @@ def alpha_beta_iterative(board, max_depth, evaluator, *, tt=None, killers=None, 
 
 Mục tiêu: thắng rõ B4 cùng trần thời gian, chỉ bằng thuật toán (không train, không engine/tablebase/sách ngoài). 4 bản theo 4 đề xuất LLM (`chatgpt.txt`, `gemini.txt`, `deepseek.txt`, `grok.txt` ở gốc repo), bản thứ 5 tổng hợp.
 
-- **Một engine, năm profile** (`ai.bench5`): `search.py` (`Engine5`, `SearchConfig`) — iterative deepening theo thời gian (`soft_fraction`/`hard_fraction` của `max_think_time_s`), PVS fail-soft, aspiration, TT khóa `board._transposition_key()` (thay theo độ sâu, đầy thì bỏ 1/4 cũ nhất), TT move → ăn quân MVV-LVA → phong cấp → 2 killer → countermove → history; null-move, LMR, RFP, futility, LMP, SEE pruning, check extension; quiescence **luôn xét mọi nước thoát chiếu** (không stand-pat), delta pruning; hòa do lặp 2 (hoặc 3) lần trong cây, contempt.
+- **Một engine, năm profile** (`ai.benchmarks_extension.bench5`): `search.py` (`Engine5`, `SearchConfig`) — iterative deepening theo thời gian (`soft_fraction`/`hard_fraction` của `max_think_time_s`), PVS fail-soft, aspiration, TT khóa `board._transposition_key()` (thay theo độ sâu, đầy thì bỏ 1/4 cũ nhất), TT move → ăn quân MVV-LVA → phong cấp → 2 killer → countermove → history; null-move, LMR, RFP, futility, LMP, SEE pruning, check extension; quiescence **luôn xét mọi nước thoát chiếu** (không stand-pat), delta pruning; hòa do lặp 2 (hoặc 3) lần trong cây, contempt.
 - **Eval** `evaluation.py` (`Evaluator5`, `EvalConfig`): PST Michniewski nội suy MG/EG theo phase (N/B 1, R 2, Q 4, tối đa 24) + thành phần bật theo profile (tốt chồng/cô lập/thông/đảo tốt, cặp tượng, xe cột mở/hàng 7, mã tiền đồn, an toàn vua, mobility B4, tempo, mop-up). Cache theo instance, đối xứng màu.
 - **Profile** `profiles.py`: mỗi tham số ghi nguồn; nguồn không nêu số thì ghi giá trị đã chọn.
 - **Cấu hình:** `max_think_time_s` mặc định 1,0 s (kể cả GUI); `<= 0` = không giới hạn, dừng ở độ sâu 5; `depth` là trần độ sâu; `fast_mode` = trần 2.
@@ -366,9 +366,9 @@ Mục tiêu: thắng rõ B4 cùng trần thời gian, chỉ bằng thuật toán
 
 Mục tiêu: mỗi B6 mạnh hơn B5 cùng nguồn; B7 mạnh hơn mọi B6. B6 theo bản cập nhật của 4 file; B7 tổng hợp cả bốn.
 
-- **Engine** `ai.bench6.search` (`Engine6`, `SearchConfig6`; B7 có bản sao riêng `ai.bench7.search`): PST + vật chất **cộng dồn theo nước** (MG/EG gói một số nguyên); **sinh nước theo giai đoạn** (TT → ăn quân tốt/phong hậu → killer/countermove → yên tĩnh theo history → ăn quân lỗ); TT list có bucket 1/2/4 ngăn + generation; cache eval; capture history, continuation history 1–3 ply, history gravity; tín hiệu *improving*; LMR log có điều chỉnh (PV, killer, history, improving, cut node); RFP, razoring, futility, LMP, history pruning, SEE pruning, ProbCut, multi-cut; singular extension, IID/IIR, check/recapture/pawn-7th extension; correction history theo cấu trúc tốt; quiescence xét mọi nước thoát chiếu, có thể thêm nước chiếu yên tĩnh; sách khai cuộc viết tay (`BOOK_LINES`, chọn bằng `seed`); 5 chính sách thời gian (`fixed`, `stability`, `panic_easy`, `complexity`, `factors`).
-- **Eval** `ai.bench6.evaluation` / `ai.bench7.evaluation` (`Evaluator6`, `EvalConfig6`): Michniewski hoặc **PeSTO**; tốt mở rộng (backward, candidate, phalanx, supported, islands); tốt thông động (bảo vệ, liên kết, bị chặn, khoảng cách vua, xe sau tốt, luật hình vuông); outpost, xe nối; mobility, **king danger** (N/B 2, R 3, Q 5, phi tuyến), đe dọa (tốt đuổi quân, quân nhẹ đuổi quân nặng, quân treo) bằng bảng tấn công bitboard; phát triển quân; mop-up có góc KBNK; hệ số hòa (tượng khác màu, ưu thế nhỏ không tốt, KNN–K, tốt cột biên); co điểm theo luật 50 nước; **lazy eval**. Đối xứng màu.
-- Profile: `ai.bench6.profiles` (4 bản) và `ai.bench7.profile` ghi nguồn từng tham số; file không nói thì dùng thiết lập mạnh nhất của lõi B6 (đã kiểm bằng trận). GPT/Grok/DeepSeek đòi "PST tapered" nên dùng PeSTO (hơn Michniewski ~+180 Elo).
+- **Engine** `ai.benchmarks_extension.bench6.search` (`Engine6`, `SearchConfig6`; B7 có bản sao riêng `ai.benchmarks_extension.bench7.search`): PST + vật chất **cộng dồn theo nước** (MG/EG gói một số nguyên); **sinh nước theo giai đoạn** (TT → ăn quân tốt/phong hậu → killer/countermove → yên tĩnh theo history → ăn quân lỗ); TT list có bucket 1/2/4 ngăn + generation; cache eval; capture history, continuation history 1–3 ply, history gravity; tín hiệu *improving*; LMR log có điều chỉnh (PV, killer, history, improving, cut node); RFP, razoring, futility, LMP, history pruning, SEE pruning, ProbCut, multi-cut; singular extension, IID/IIR, check/recapture/pawn-7th extension; correction history theo cấu trúc tốt; quiescence xét mọi nước thoát chiếu, có thể thêm nước chiếu yên tĩnh; sách khai cuộc viết tay (`BOOK_LINES`, chọn bằng `seed`); 5 chính sách thời gian (`fixed`, `stability`, `panic_easy`, `complexity`, `factors`).
+- **Eval** `ai.benchmarks_extension.bench6.evaluation` / `ai.benchmarks_extension.bench7.evaluation` (`Evaluator6`, `EvalConfig6`): Michniewski hoặc **PeSTO**; tốt mở rộng (backward, candidate, phalanx, supported, islands); tốt thông động (bảo vệ, liên kết, bị chặn, khoảng cách vua, xe sau tốt, luật hình vuông); outpost, xe nối; mobility, **king danger** (N/B 2, R 3, Q 5, phi tuyến), đe dọa (tốt đuổi quân, quân nhẹ đuổi quân nặng, quân treo) bằng bảng tấn công bitboard; phát triển quân; mop-up có góc KBNK; hệ số hòa (tượng khác màu, ưu thế nhỏ không tốt, KNN–K, tốt cột biên); co điểm theo luật 50 nước; **lazy eval**. Đối xứng màu.
+- Profile: `ai.benchmarks_extension.bench6.profiles` (4 bản) và `ai.benchmarks_extension.bench7.profile` ghi nguồn từng tham số; file không nói thì dùng thiết lập mạnh nhất của lõi B6 (đã kiểm bằng trận). GPT/Grok/DeepSeek đòi "PST tapered" nên dùng PeSTO (hơn Michniewski ~+180 Elo).
 - **B7** chọn bằng ablation (200 ván/biến thể ở 0,4 s): PeSTO + HCE (bỏ đi kém ~−60 Elo), singular, ProbCut, correction history, LMP; thời gian cố định 0,65·T (dừng sớm theo độ ổn định và 0,8·T đều yếu hơn).
 - **Hạ tầng thời gian (B5–B8):** chừa 100 ms (hoặc 15 %) trước trần, kiểm tra đồng hồ mỗi 128 node, tạm tắt GC chu kỳ của Python khi tìm (một lần quét GC qua TT có thể dừng ~100 ms); không bao giờ vượt `max_think_time_s` (đề xuất "panic 1,5–2 s" bị chặn ở mức hard).
 - **Kết quả** (1 s/nước, khai cuộc ngẫu nhiên 4 nửa nước, mỗi khai cuộc 2 ván đổi màu, tối đa 150 nửa nước):
@@ -378,7 +378,7 @@ Mục tiêu: mỗi B6 mạnh hơn B5 cùng nguồn; B7 mạnh hơn mọi B6. B6 
 
 #### 4.9.3 Benchmark 8 "Luna" (2026-10-08)
 
-Mục tiêu: vượt B7 theo bản nghiên cứu "Luna B8 — Efficient & Verified Selective Search". `ai.bench8` là bản sao lõi Dragon (`Engine8`, `SearchConfig8`, `Evaluator8`), mỗi phương án là một công tắc:
+Mục tiêu: vượt B7 theo bản nghiên cứu "Luna B8 — Efficient & Verified Selective Search". `ai.benchmarks_extension.bench8` là bản sao lõi Dragon (`Engine8`, `SearchConfig8`, `Evaluator8`), mỗi phương án là một công tắc:
 - `fast_see` (**bật**): SEE theo ngưỡng `see_ge` (vòng swap kiểu Stockfish, dừng sớm); khớp SEE đầy đủ trên 88.676 trường hợp, cùng nước và số node với B7 ở độ sâu cố định; kèm cache phần đánh giá quân.
 - `verify` (`Verify8`, tắt): nước bị LMR giảm ≥ 2 ply mà hụt alpha < 60 cp được tìm lại ở độ sâu trung gian, ≤ 5 % số node (`tactical_only`: chỉ nước gần vua địch hoặc đẩy tốt xa).
 - `push_guard` (tắt): tốt tiến lên hàng 6/7 không bị LMP, futility, SEE pruning, LMR.

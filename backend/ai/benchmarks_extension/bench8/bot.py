@@ -1,13 +1,15 @@
-"""Benchmark 6 bots (one class per profile), loaded through ai.registry."""
+"""Benchmark 8 "Luna" bot, loaded through ai.registry."""
 
 from __future__ import annotations
+
+from dataclasses import replace
 
 import chess
 
 from ai.base_bot import BaseBot
-from ai.bench6.evaluation import Evaluator6
-from ai.bench6.profiles import PROFILES6, Profile6
-from ai.bench6.search import Engine6
+from ai.benchmarks_extension.bench8.evaluation import Evaluator8
+from ai.benchmarks_extension.bench8.profile import LUNA, Profile8
+from ai.benchmarks_extension.bench8.search import Engine8
 
 DEFAULT_TIME_LIMIT_S = 1.0
 MAX_DEPTH = 64
@@ -37,19 +39,32 @@ def resolve_depth(config: dict, time_limit_s: float | None) -> int:
     return UNLIMITED_DEPTH if time_limit_s is None else MAX_DEPTH
 
 
-class _Benchmark6Bot(BaseBot):
-    """Selective PVS bot (Benchmark 6) configured by one profile."""
+def resolve_ply_limit(config: dict, default: int) -> int:
+    """Game length after which the game is drawn: ``max_plies`` (``<= 0`` = no limit)."""
+    try:
+        return max(0, int(config.get("max_plies", default)))
+    except (TypeError, ValueError):
+        return default
 
-    profile: Profile6
+
+class Benchmark8LunaBot(BaseBot):
+    """Benchmark 8 "Luna": Dragon plus the Luna switches that won their matches."""
+
+    bot_id = "bench8_luna"
+    display_name = "Benchmark 8 - Luna"
+    profile: Profile8 = LUNA
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
         self.time_limit_s = resolve_time_limit(self.config)
         self.max_depth = resolve_depth(self.config, self.time_limit_s)
         seed = self.config.get("seed")
-        self._engine = Engine6(
-            self.profile.search,
-            Evaluator6(self.profile.evaluation),
+        search = self.profile.search
+        if search.ply_limit:
+            search = replace(search, ply_limit=resolve_ply_limit(self.config, search.ply_limit))
+        self._engine = Engine8(
+            search,
+            Evaluator8(self.profile.evaluation),
             seed if isinstance(seed, int) and seed >= 0 else None,
         )
 
@@ -73,35 +88,3 @@ class _Benchmark6Bot(BaseBot):
         """Clear the transposition table, histories and caches between games."""
         super().reset()
         self._engine.clear()
-
-
-class Benchmark6GptBot(_Benchmark6Bot):
-    """Benchmark 6 from the ChatGPT design (``chatgpt.txt``): adaptive selective PVS."""
-
-    bot_id = "bench6_gpt"
-    display_name = "Benchmark 6 - GPT"
-    profile = PROFILES6["gpt"]
-
-
-class Benchmark6GeminiBot(_Benchmark6Bot):
-    """Benchmark 6 from the Gemini design (``gemini.txt``): incremental PeSTO + razoring."""
-
-    bot_id = "bench6_gemini"
-    display_name = "Benchmark 6 - Gemini"
-    profile = PROFILES6["gemini"]
-
-
-class Benchmark6GrokBot(_Benchmark6Bot):
-    """Benchmark 6 from the Grok design (``grok.txt``): singular extensions + rich HCE."""
-
-    bot_id = "bench6_grok"
-    display_name = "Benchmark 6 - Grok"
-    profile = PROFILES6["grok"]
-
-
-class Benchmark6DeepSeekBot(_Benchmark6Bot):
-    """Benchmark 6 from the DeepSeek design (``deepseek.txt``): every modern technique."""
-
-    bot_id = "bench6_deepseek"
-    display_name = "Benchmark 6 - DeepSeek"
-    profile = PROFILES6["deepseek"]

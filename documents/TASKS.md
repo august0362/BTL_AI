@@ -95,7 +95,7 @@
 > Code xong trên nhánh làm việc; `[x]` chờ PR/merge để tính hoàn tất.
 
 - [x] **BENCH-1** `X` B1–B4 trong `backend/ai/benchmarks/` + đăng ký opt-in `BENCHMARK_BOTS`
-- [x] **BENCH-5..8** `C` B5 (5 bot), B6 (4 bot), B7 Dragon, B8 Luna — mỗi thế hệ một package `ai.bench5` … `ai.bench8`, `[benchmarks] max_level`, tên bot trong config
+- [x] **BENCH-5..8** `C` B5 (5 bot), B6 (4 bot), B7 Dragon, B8 Luna — mỗi thế hệ một package `ai.benchmarks_extension.bench5` … `ai.benchmarks_extension.bench8`, `[benchmarks] max_level`, tên bot trong config
 - [x] **TOUR-1** `X` `tournament_config.py` + `[tournament]` (`max_plies`, `depth`, `max_history`); **TOUR-1b** trần `max_think_time_s` (1,0 s), benchmark tự dừng đúng hạn; `depth = 0` = không ép độ sâu
 - [x] **TOUR-2** `X` `round_robin.py`: điểm 1/0,5/0, hạng "1224", bot mới mỗi ván, dừng giữa chừng; sau đổi sang **lượt thách đấu** (mỗi bot thách mọi bot khác, cầm Trắng)
 - [x] **TOUR-3** `X` `tournament_history.py`: "Trận Chiến Lần n" (`battle_NNNN.json`), tách khỏi Elo

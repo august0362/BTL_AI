@@ -1,4 +1,4 @@
-"""Selective PVS engine behind Benchmarks 6 and 7.
+"""Selective PVS engine of Benchmark 7 (own copy, free to diverge from Benchmark 6).
 
 A superset of the Benchmark 5 engine: incremental material/PST, a list-based bucketed
 transposition table with generations, capture/continuation history, an "improving" signal,
@@ -20,7 +20,7 @@ from typing import NamedTuple
 
 import chess
 
-from ai.bench6.evaluation import Evaluator6
+from ai.benchmarks_extension.bench7.evaluation import Evaluator6
 
 MATE = 100_000
 MATE_BOUND = MATE - 1_000

@@ -19,17 +19,17 @@ BENCHMARK_BOTS: dict[str, str] = {
     "bench_alphabeta_tt": "ai.benchmarks.bot:BenchmarkAlphaBetaTTBot",
     "bench_alphabeta_custom": "ai.benchmarks.bot:BenchmarkAlphaBetaCustomBot",
     # Each later generation is its own package, plugged in only here.
-    "bench5_gpt": "ai.bench5.bot:Benchmark5GptBot",
-    "bench5_gemini": "ai.bench5.bot:Benchmark5GeminiBot",
-    "bench5_deepseek": "ai.bench5.bot:Benchmark5DeepSeekBot",
-    "bench5_grok": "ai.bench5.bot:Benchmark5GrokBot",
-    "bench5_hybrid": "ai.bench5.bot:Benchmark5HybridBot",
-    "bench6_gpt": "ai.bench6.bot:Benchmark6GptBot",
-    "bench6_gemini": "ai.bench6.bot:Benchmark6GeminiBot",
-    "bench6_grok": "ai.bench6.bot:Benchmark6GrokBot",
-    "bench6_deepseek": "ai.bench6.bot:Benchmark6DeepSeekBot",
-    "bench7": "ai.bench7.bot:Benchmark7Bot",
-    "bench8_luna": "ai.bench8.bot:Benchmark8LunaBot",
+    "bench5_gpt": "ai.benchmarks_extension.bench5.bot:Benchmark5GptBot",
+    "bench5_gemini": "ai.benchmarks_extension.bench5.bot:Benchmark5GeminiBot",
+    "bench5_deepseek": "ai.benchmarks_extension.bench5.bot:Benchmark5DeepSeekBot",
+    "bench5_grok": "ai.benchmarks_extension.bench5.bot:Benchmark5GrokBot",
+    "bench5_hybrid": "ai.benchmarks_extension.bench5.bot:Benchmark5HybridBot",
+    "bench6_gpt": "ai.benchmarks_extension.bench6.bot:Benchmark6GptBot",
+    "bench6_gemini": "ai.benchmarks_extension.bench6.bot:Benchmark6GeminiBot",
+    "bench6_grok": "ai.benchmarks_extension.bench6.bot:Benchmark6GrokBot",
+    "bench6_deepseek": "ai.benchmarks_extension.bench6.bot:Benchmark6DeepSeekBot",
+    "bench7": "ai.benchmarks_extension.bench7.bot:Benchmark7Bot",
+    "bench8_luna": "ai.benchmarks_extension.bench8.bot:Benchmark8LunaBot",
 }
 # Benchmark generation of every benchmark bot; ``[benchmarks] max_level`` hides higher ones.
 BENCHMARK_LEVELS: dict[str, float] = {

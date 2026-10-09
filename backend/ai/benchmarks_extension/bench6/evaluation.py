@@ -1,4 +1,4 @@
-"""Hand-crafted evaluation of Benchmark 7 (own copy, free to diverge from Benchmark 6).
+"""Hand-crafted evaluation for Benchmarks 6 and 7.
 
 Material and piece-square values are packed into one integer (middlegame << 20 + endgame)
 so the search can update them incrementally on every move. Every other knowledge term is
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import chess
 
-from ai.bench7.tables import KING_ENDGAME_TABLE, PST_TABLES
+from ai.benchmarks_extension.bench6.tables import KING_ENDGAME_TABLE, PST_TABLES
 
 SHIFT = 20
 HALF = 1 << (SHIFT - 1)

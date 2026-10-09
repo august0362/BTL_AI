@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.bench6.evaluation import EvalConfig6, MopUp6
-from ai.bench6.search import (
+from ai.benchmarks_extension.bench6.evaluation import EvalConfig6, MopUp6
+from ai.benchmarks_extension.bench6.search import (
     Lmr6,
     NullMove6,
     Quiescence6,

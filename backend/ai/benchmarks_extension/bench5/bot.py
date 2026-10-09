@@ -1,13 +1,13 @@
-"""Benchmark 7 "Dragon" bot, loaded through ai.registry."""
+"""Benchmark 5 bots (one class per profile), loaded through ai.registry."""
 
 from __future__ import annotations
 
 import chess
 
 from ai.base_bot import BaseBot
-from ai.bench7.evaluation import Evaluator6
-from ai.bench7.profile import B7, Profile7
-from ai.bench7.search import Engine6
+from ai.benchmarks_extension.bench5.evaluation import Evaluator5
+from ai.benchmarks_extension.bench5.profiles import PROFILES, Profile5
+from ai.benchmarks_extension.bench5.search import Engine5
 
 DEFAULT_TIME_LIMIT_S = 1.0
 MAX_DEPTH = 64
@@ -37,23 +37,16 @@ def resolve_depth(config: dict, time_limit_s: float | None) -> int:
     return UNLIMITED_DEPTH if time_limit_s is None else MAX_DEPTH
 
 
-class Benchmark7Bot(BaseBot):
-    """Benchmark 7 "Dragon": the strongest combination of the Benchmark 6 designs."""
+class _Benchmark5Bot(BaseBot):
+    """Time-managed PVS bot configured by one Benchmark 5 profile."""
 
-    bot_id = "bench7"
-    display_name = "Benchmark 7 - Dragon"
-    profile: Profile7 = B7
+    profile: Profile5
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
         self.time_limit_s = resolve_time_limit(self.config)
         self.max_depth = resolve_depth(self.config, self.time_limit_s)
-        seed = self.config.get("seed")
-        self._engine = Engine6(
-            self.profile.search,
-            Evaluator6(self.profile.evaluation),
-            seed if isinstance(seed, int) and seed >= 0 else None,
-        )
+        self._engine = Engine5(self.profile.search, Evaluator5(self.profile.evaluation))
 
     def select_move(self, board: chess.Board) -> chess.Move:
         """Return the best move found within the time budget."""
@@ -72,6 +65,46 @@ class Benchmark7Bot(BaseBot):
         return result.move
 
     def reset(self) -> None:
-        """Clear the transposition table, histories and caches between games."""
+        """Clear the transposition table, history and caches between games."""
         super().reset()
         self._engine.clear()
+
+
+class Benchmark5GptBot(_Benchmark5Bot):
+    """Benchmark 5 built only from the ChatGPT design (``chatgpt.txt``)."""
+
+    bot_id = "bench5_gpt"
+    display_name = "Benchmark 5 - GPT"
+    profile = PROFILES["gpt"]
+
+
+class Benchmark5GeminiBot(_Benchmark5Bot):
+    """Benchmark 5 built only from the Gemini design (``gemini.txt``)."""
+
+    bot_id = "bench5_gemini"
+    display_name = "Benchmark 5 - Gemini"
+    profile = PROFILES["gemini"]
+
+
+class Benchmark5DeepSeekBot(_Benchmark5Bot):
+    """Benchmark 5 built only from the DeepSeek design (``deepseek.txt``)."""
+
+    bot_id = "bench5_deepseek"
+    display_name = "Benchmark 5 - DeepSeek"
+    profile = PROFILES["deepseek"]
+
+
+class Benchmark5GrokBot(_Benchmark5Bot):
+    """Benchmark 5 built only from the Grok design (``grok.txt``)."""
+
+    bot_id = "bench5_grok"
+    display_name = "Benchmark 5 - Grok"
+    profile = PROFILES["grok"]
+
+
+class Benchmark5HybridBot(_Benchmark5Bot):
+    """Benchmark 5 combining the four designs, tuned by matches."""
+
+    bot_id = "bench5_hybrid"
+    display_name = "Benchmark 5 - Hybrid"
+    profile = PROFILES["hybrid"]

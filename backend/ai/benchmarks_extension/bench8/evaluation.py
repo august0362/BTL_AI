@@ -1,8 +1,8 @@
-"""Hand-crafted evaluation for Benchmarks 6 and 7.
+"""Hand-crafted evaluation of Benchmark 8 "Luna" (Dragon's PeSTO + HCE, KPK rules).
 
 Material and piece-square values are packed into one integer (middlegame << 20 + endgame)
 so the search can update them incrementally on every move. Every other knowledge term is
-switched on and weighted by an :class:`EvalConfig6`. Scores are centipawns for the side to
+switched on and weighted by an :class:`EvalConfig8`. Scores are centipawns for the side to
 move; the evaluation is colour-symmetric.
 """
 
@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import chess
 
-from ai.bench6.tables import KING_ENDGAME_TABLE, PST_TABLES
+from ai.benchmarks_extension.bench8.tables import KING_ENDGAME_TABLE, PST_TABLES
 
 SHIFT = 20
 HALF = 1 << (SHIFT - 1)
@@ -175,7 +175,7 @@ PESTO_EG = {
 
 
 @dataclass(frozen=True)
-class MopUp6:
+class MopUp8:
     """Drive the bare (or nearly bare) king to the edge, or to the right corner for KBNK."""
 
     min_advantage: int = 300
@@ -188,8 +188,8 @@ class MopUp6:
 
 
 @dataclass(frozen=True)
-class EvalConfig6:
-    """Weights of the Benchmark 6/7 evaluation; zero/False switches a term off."""
+class EvalConfig8:
+    """Weights of the Benchmark 8 evaluation; zero/False switches a term off."""
 
     tables: str = "michniewski"  # "michniewski" | "pesto"
     mg_values: tuple[int, ...] = MATERIAL
@@ -232,10 +232,11 @@ class EvalConfig6:
     # phases and knowledge
     development: int = 0  # opening-phase term (3-phase evaluation)
     tempo: int = 0
-    mopup: MopUp6 | None = None
+    mopup: MopUp8 | None = None
     scaling: bool = False  # opposite bishops, pawnless small edges, KNN vs K, rook-pawn KPK
     fifty_move_scaling: bool = False
     lazy_margin: int = 0  # > 0: skip activity/passer terms far outside the window
+    kpk: int = 0  # > 0: KPK key-square rules, bonus when the attacking king holds a key square
 
 
 def _pawn_attacks(pawns: int, color: chess.Color) -> int:
@@ -307,7 +308,7 @@ def _center_distance(square: int) -> int:
     return max(abs(2 * file - 7), abs(2 * rank - 7)) // 2
 
 
-def build_pst(config: EvalConfig6) -> list[list[list[int]]]:
+def build_pst(config: EvalConfig8) -> list[list[list[int]]]:
     """Packed material + PST value per [colour][piece type][square], owner's perspective."""
     pst: list[list[list[int]]] = [[[0] * 64 for _ in range(7)] for _ in range(2)]
     pesto = config.tables == "pesto"
@@ -330,14 +331,15 @@ def build_pst(config: EvalConfig6) -> list[list[list[int]]]:
     return pst
 
 
-class Evaluator6:
+class Evaluator8:
     """Callable evaluator with per-instance caches (no state shared between bots)."""
 
-    def __init__(self, config: EvalConfig6) -> None:
+    def __init__(self, config: EvalConfig8) -> None:
         self.config = config
         self.pst = build_pst(config)
         self._pawn_cache: dict[tuple[int, int], tuple[int, int, int, int]] = {}
         self._king_cache: dict[tuple[int, int, int, int], int] = {}
+        self._piece_cache: dict[tuple[int, ...], tuple[int, int]] = {}
         cfg = config
         self._king_terms = bool(
             cfg.king_shield or cfg.king_open_file or cfg.king_semi_open_file or cfg.king_storm
@@ -358,6 +360,7 @@ class Evaluator6:
         """Drop the pawn and king caches."""
         self._pawn_cache.clear()
         self._king_cache.clear()
+        self._piece_cache.clear()
 
     def pst_sum(self, board: chess.Board) -> int:
         """Packed material + PST total from White's view (the incremental baseline)."""
@@ -424,7 +427,14 @@ class Evaluator6:
             MAX_PHASE,
             (knights | bishops).bit_count() + 2 * rooks.bit_count() + 4 * queens.bit_count(),
         )
-        piece_mg, piece_eg = self._pieces(board, white, black, white_pawns, black_pawns)
+        piece_key = (white, occupied, knights, bishops, rooks, pawns)
+        cached = self._piece_cache.get(piece_key)
+        if cached is None:
+            cached = self._pieces(board, white, black, white_pawns, black_pawns)
+            if len(self._piece_cache) >= CACHE_LIMIT:
+                self._piece_cache.clear()
+            self._piece_cache[piece_key] = cached
+        piece_mg, piece_eg = cached
         mg += piece_mg
         eg += piece_eg
         if cfg.development and phase >= 18:
@@ -452,6 +462,8 @@ class Evaluator6:
         score = int((mg * phase + eg * (MAX_PHASE - phase)) / MAX_PHASE)
         if cfg.mopup is not None and phase <= max(cfg.mopup.max_phase, 8):
             score += self._mopup(board, phase)
+        if cfg.kpk and phase == 0 and board.pawns.bit_count() == 1:
+            score = self._kpk(board, score)
         if cfg.scaling and phase <= 10:
             score = self._scale(board, score, white, black)
         if cfg.fifty_move_scaling and board.halfmove_clock > 20:
@@ -864,6 +876,41 @@ class Evaluator6:
                 nearest = min(chess.square_distance(enemy_king, corner) for corner in corners)
                 bonus += 25 * (7 - nearest)
         return bonus if strong == chess.WHITE else -bonus
+
+    def _kpk(self, board: chess.Board, score: int) -> int:
+        """King and pawn vs king: key squares, the defender in front, a pawn that falls.
+
+        Conservative rules, not a tablebase: a held key square earns a bonus, a defending
+        king in front of the pawn (or about to take it) shrinks the score towards a draw.
+        """
+        pawns = board.pawns
+        pawn = pawns.bit_length() - 1
+        strong = bool(pawns & board.occupied_co[chess.WHITE])
+        own_king, weak_king = board.king(strong), board.king(not strong)
+        if own_king is None or weak_king is None:
+            return score
+        if (
+            board.turn != strong
+            and chess.square_distance(weak_king, pawn) == 1
+            and chess.square_distance(own_king, pawn) > 1
+        ):
+            return int(score / 16)  # the pawn falls
+        file = pawn & 7
+        if file in (0, 7):
+            return score  # rook pawns: see _scale
+        rel = _relative_rank(strong, pawn)
+        ahead = (2,) if rel <= 3 else (1, 2) if rel <= 5 else (0, 1)
+        key = 0
+        for distance in ahead:
+            target = rel + distance
+            if target <= 7:
+                rank = target if strong else 7 - target
+                key |= (chess.BB_FILES[file] | ADJACENT_FILES[file]) & chess.BB_RANKS[rank]
+        if key & chess.BB_SQUARES[own_king]:
+            return score + (self.config.kpk if strong else -self.config.kpk)
+        if FRONT_SPAN[strong][pawn] & chess.BB_SQUARES[weak_king]:
+            return int(score / 8)
+        return score
 
     def _scale(self, board: chess.Board, score: int, white: int, black: int) -> int:
         """Shrink scores of drawish endgames towards zero."""

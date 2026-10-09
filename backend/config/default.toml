@@ -66,7 +66,7 @@ bots = [
     "bench6_gpt", "bench6_gemini", "bench6_grok", "bench6_deepseek", "bench7",
     "bench8_luna",
 ]
-matches_per_pair = 1      # số ván mỗi lượt thách đấu: lần lượt từng bot thách đấu mọi bot khác và cầm Trắng
+matches_per_pair = 2      # số ván mỗi lượt thách đấu: lần lượt từng bot thách đấu mọi bot khác và cầm Trắng
                           # (A thách B, C… rồi B thách A, C…) → mỗi cặp 2 × số này ván, đủ Trắng/Đen
 max_history = 15           # số "Trận Chiến Lần n" lưu lại gần nhất
 max_plies = 150            # quá số nửa nước này thì xử hòa (tránh vờn nhau)
@@ -111,7 +111,7 @@ display_name = "Benchmark 4 · Alpha-Beta Custom"   # tên hiển thị (mọi n
 depth = 3
 evaluator = "advanced"
 
-# Benchmark 5: PVS dùng hết ngân sách thời gian (module ai.bench5).
+# Benchmark 5: PVS dùng hết ngân sách thời gian (module ai.benchmarks_extension.bench5).
 # max_think_time_s: giây mỗi nước (mặc định 1.0; 0 = không giới hạn, khi đó dừng ở độ sâu 5).
 # depth: chỉ đặt khi muốn chặn độ sâu tối đa.
 [bots.bench5_gpt]
@@ -134,7 +134,7 @@ max_think_time_s = 1.0
 display_name = "Benchmark 5 · Hybrid"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 
-# Benchmark 6 (4 profile, module ai.bench6) và Benchmark 7 (module ai.bench7): PVS chọn lọc.
+# Benchmark 6 (4 profile, module ai.benchmarks_extension.bench6) và Benchmark 7 (module ai.benchmarks_extension.bench7): PVS chọn lọc.
 # Cùng quy ước với Benchmark 5: max_think_time_s mặc định 1.0; seed dùng cho sách khai cuộc.
 [bots.bench6_gpt]
 display_name = "Benchmark 6 · GPT"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
@@ -156,7 +156,7 @@ max_think_time_s = 1.0
 display_name = "Benchmark 7 · Dragon"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 
-# Benchmark 8 "Luna" (module ai.bench8): lõi Dragon + SEE nhanh; chưa vượt B7 (xem CONTEXT §4.9.3). Hiện khi max_level >= 8.
+# Benchmark 8 "Luna" (module ai.benchmarks_extension.bench8): lõi Dragon + SEE nhanh; chưa vượt B7 (xem CONTEXT §4.9.3). Hiện khi max_level >= 8.
 [bots.bench8_luna]
 display_name = "Benchmark 8 · Luna"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0

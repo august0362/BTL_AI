@@ -7,11 +7,11 @@ import chess
 import pytest
 
 from ai import registry
-from ai.bench6.evaluation import Evaluator6, pack, unpack
-from ai.bench6.profiles import PROFILES6
-from ai.bench6.search import BOOK_LINES, EXACT, Engine6, _build_book
-from ai.bench7.evaluation import Evaluator6 as Evaluator7
-from ai.bench7.profile import B7
+from ai.benchmarks_extension.bench6.evaluation import Evaluator6, pack, unpack
+from ai.benchmarks_extension.bench6.profiles import PROFILES6
+from ai.benchmarks_extension.bench6.search import BOOK_LINES, EXACT, Engine6, _build_book
+from ai.benchmarks_extension.bench7.evaluation import Evaluator6 as Evaluator7
+from ai.benchmarks_extension.bench7.profile import B7
 
 B6_IDS = ["bench6_gpt", "bench6_gemini", "bench6_grok", "bench6_deepseek", "bench7"]
 MATE_IN_ONE = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"

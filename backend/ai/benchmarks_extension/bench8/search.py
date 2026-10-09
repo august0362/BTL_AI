@@ -1,10 +1,14 @@
-"""Selective PVS engine of Benchmark 7 (own copy, free to diverge from Benchmark 6).
+"""Selective PVS engine of Benchmark 8 "Luna" (grown from the Dragon engine of Benchmark 7).
 
-A superset of the Benchmark 5 engine: incremental material/PST, a list-based bucketed
-transposition table with generations, capture/continuation history, an "improving" signal,
-logarithmic LMR, RFP, razoring, futility, LMP, history pruning, ProbCut, multi-cut, singular
-extensions, IID/IIR, correction history, a hand-written opening book and several time
-policies. Every technique is configured by :class:`SearchConfig6`; nothing is global.
+Dragon's search (incremental material/PST, bucketed TT with generations, TT-first staged move
+generation, capture/continuation history, logarithmic LMR, RFP, razoring, futility, LMP, SEE
+pruning, ProbCut, singular extensions, IIR, correction history, opening book) plus Luna's
+switches, each of which can be turned on alone (see :class:`SearchConfig8`):
+
+* ``fast_see``: threshold SEE (``see_ge``, Stockfish's swap loop with early exits);
+* ``verify``: selective fail-low verification of deeply reduced late moves;
+* ``push_guard``: pawn pushes to the 6th/7th rank escape LMP, futility and LMR;
+* ``ply_limit``: positions past the tournament's ply limit are draws.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from typing import NamedTuple
 
 import chess
 
-from ai.bench7.evaluation import Evaluator6
+from ai.benchmarks_extension.bench8.evaluation import Evaluator8
 
 MATE = 100_000
 MATE_BOUND = MATE - 1_000
@@ -51,7 +55,7 @@ def _no_draw_bias(root_eval: int) -> tuple[int, int]:
 
 
 @dataclass(frozen=True)
-class TimeConfig6:
+class TimeConfig8:
     """Per-move time use. All limits are fractions of ``max_think_time_s`` (never above 1)."""
 
     soft: float = 0.6  # default: no new iteration after this share
@@ -62,7 +66,7 @@ class TimeConfig6:
 
 
 @dataclass(frozen=True)
-class NullMove6:
+class NullMove8:
     """Adaptive null move: R = base + depth // depth_div + min(cap, (eval - beta) // eval_div)."""
 
     min_depth: int = 3
@@ -78,7 +82,7 @@ class NullMove6:
 
 
 @dataclass(frozen=True)
-class Lmr6:
+class Lmr8:
     """Logarithmic late move reductions with adjustments."""
 
     min_depth: int = 3
@@ -94,7 +98,7 @@ class Lmr6:
 
 
 @dataclass(frozen=True)
-class Quiescence6:
+class Quiescence8:
     """Leaf search; a side in check always searches every evasion (no stand-pat)."""
 
     max_ply: int = 10
@@ -106,10 +110,20 @@ class Quiescence6:
 
 
 @dataclass(frozen=True)
-class SearchConfig6:
-    """All switches and parameters of one Benchmark 6/7 search."""
+class Verify8:
+    """Selective fail-low verification of reduced late moves (Luna)."""
 
-    time: TimeConfig6 = field(default_factory=TimeConfig6)
+    min_reduction: int = 2  # only moves reduced at least this much
+    margin: int = 60  # ... whose reduced score is within this many cp below alpha
+    budget_pct: int = 5  # verification may use at most this share of the nodes
+    tactical_only: bool = True  # ... and that land near the enemy king or push a pawn far
+
+
+@dataclass(frozen=True)
+class SearchConfig8:
+    """All switches and parameters of one Benchmark 8 search."""
+
+    time: TimeConfig8 = field(default_factory=TimeConfig8)
     check_mask: int = 127  # time is checked every ``check_mask + 1`` nodes
     stop_on_mate: bool = True
     aspiration: tuple[int, ...] = (30, 100, 300)  # successive half-windows
@@ -125,7 +139,7 @@ class SearchConfig6:
     capture_history: bool = False
     continuation: tuple[int, ...] = ()  # plies back, e.g. (1, 2)
     capture_order: str = "see"  # "mvv" | "attacked" | "see"
-    null_move: NullMove6 | None = field(default_factory=NullMove6)
+    null_move: NullMove8 | None = field(default_factory=NullMove8)
     reverse_futility: tuple[int, int, int] | None = None  # (max depth, margin/ply, improving)
     razoring: tuple[int, int, int] | None = None  # (max depth, base, per ply)
     futility: tuple[int, int, int] | None = None  # (max depth, base, per ply)
@@ -141,26 +155,30 @@ class SearchConfig6:
     # (min depth, TT depth slack, fixed margin, margin per ply)
     singular: tuple[int, int, int, int] | None = None
     singular_multicut: bool = False
-    lmr: Lmr6 | None = field(default_factory=Lmr6)
+    lmr: Lmr8 | None = field(default_factory=Lmr8)
     check_extensions: int = 2
     capture_extension: bool = False  # SEE >= 0 captures/promotions at depth 1
     recapture_extension: bool = False
     pawn_seventh_extension: bool = False
     bad_capture_reduction: bool = False  # SEE < 0 captures searched one ply shallower
     mate_distance_pruning: bool = True
-    quiescence: Quiescence6 = field(default_factory=Quiescence6)
+    quiescence: Quiescence8 = field(default_factory=Quiescence8)
     twofold: bool = True
     draw_scores: Callable[[int], tuple[int, int]] = _no_draw_bias
     root_repetition_filter: int | None = None
     root_repetition_penalty: int = 0
     correction: tuple[int, int] | None = None  # (table bits, clamp in centipawns)
     book: bool = False
+    fast_see: bool = True  # threshold SEE instead of the full swap list
+    verify: Verify8 | None = None
+    push_guard: bool = False  # pawn pushes to the 6th/7th rank are never pruned or reduced
+    ply_limit: int = 0  # > 0: the game is drawn after this many plies (tournament max_plies)
 
 
-class Engine6:
+class Engine8:
     """Iterative-deepening selective PVS search; all state lives in the instance."""
 
-    def __init__(self, config: SearchConfig6, evaluator: Evaluator6, seed: int | None = None):
+    def __init__(self, config: SearchConfig8, evaluator: Evaluator8, seed: int | None = None):
         self.config = config
         self.evaluator = evaluator
         self.pst = evaluator.pst
@@ -172,6 +190,8 @@ class Engine6:
         self.repetitions: Counter[int] = Counter()
         self.rep_draw = 0
         self.final_draw = 0
+        self.horizon = 0  # plies from the root to the game's ply limit (0 = none)
+        self.verify_nodes = 0
         self.packed = 0
         self._tt: list | None = None
         self._tables_ready = False
@@ -264,6 +284,9 @@ class Engine6:
         )
         root_eval = self.evaluator(board, self.packed)
         self.rep_draw, self.final_draw = cfg.draw_scores(root_eval)
+        game_ply = board.ply()
+        self.horizon = cfg.ply_limit - game_ply if cfg.ply_limit and game_ply < cfg.ply_limit else 0
+        self.verify_nodes = 0
 
         if cfg.book:
             book_move = self._book_move(board)
@@ -520,6 +543,11 @@ class Engine6:
             return self.rep_draw if ply % 2 == 0 else -self.rep_draw
         if board.halfmove_clock >= 100:
             return self.final_draw if ply % 2 == 0 else -self.final_draw
+        if self.horizon and ply >= self.horizon:
+            # The game stops here: checkmate still counts, anything else is a draw.
+            if board.is_check() and not any(board.generate_legal_moves()):
+                return -(MATE - ply)
+            return self.final_draw if ply % 2 == 0 else -self.final_draw
         if ply >= MAX_PLY:
             return self._static(key)
         if cfg.mate_distance_pruning:
@@ -772,10 +800,18 @@ class Engine6:
         any_legal = False
         prev_to = previous.to_square if previous else -1
 
+        push_guard = cfg.push_guard
+        verify = cfg.verify
         for move, hist in self._staged(board, ply, tt_move, excluded, counter):
             any_legal = True
             capture = board.is_capture(move)
             quiet = not capture and move.promotion is None
+            guarded = (
+                push_guard
+                and quiet
+                and (board.pawns >> move.from_square) & 1
+                and ((move.to_square >> 3) if board.turn else 7 - (move.to_square >> 3)) >= 5
+            )
             if quiet:
                 quiets_seen += 1
                 if hist is None:
@@ -783,14 +819,14 @@ class Engine6:
             else:
                 hist = 0
             if searched and best_score > -MATE_BOUND and not in_check:
-                if quiet:
+                if quiet and not guarded:
                     if lmp_limit is not None and quiets_seen > lmp_limit:
                         continue
                     if history_prune is not None and hist < -history_prune[1] * depth:
                         continue
-                if see_limits is not None:
+                if see_limits is not None and not guarded:
                     margin = see_limits[1] if capture else see_limits[2]
-                    if margin and see(board, move) < -margin * depth:
+                    if margin and not self._see_ge(board, move, -margin * depth):
                         continue
             special = move == tt_move or move in killers or move == counter
             self._push(move, ply)
@@ -798,6 +834,7 @@ class Engine6:
             if (
                 futile
                 and quiet
+                and not guarded
                 and searched
                 and not gives_check
                 and not (cfg.futility_spares_good_quiets and (special or hist > 0))
@@ -848,6 +885,7 @@ class Engine6:
                     and searched >= lmr.full_moves
                     and not in_check
                     and not gives_check
+                    and not guarded
                     and move != tt_move
                     and (quiet or (lmr.captures and capture))
                 ):
@@ -873,6 +911,24 @@ class Engine6:
                     score = -self._search(
                         new_depth, -alpha - 1, -alpha, ply + 1, child_ext, False, not cut
                     )
+                elif (
+                    verify is not None
+                    and reduction >= verify.min_reduction
+                    and score > alpha - verify.margin
+                    and self.verify_nodes * 100 <= self.nodes * verify.budget_pct
+                    and (not verify.tactical_only or self._tactical(board, move))
+                ):
+                    # Selective fail-low verification: a deeply reduced move that only just
+                    # failed low gets one intermediate-depth look before it is dismissed.
+                    before = self.nodes
+                    score = -self._search(
+                        new_depth - 1, -alpha - 1, -alpha, ply + 1, child_ext, False, True
+                    )
+                    self.verify_nodes += self.nodes - before
+                    if score > alpha:
+                        score = -self._search(
+                            new_depth, -alpha - 1, -alpha, ply + 1, child_ext, False, not cut
+                        )
                 if pv and alpha < score < beta:
                     score = -self._search(new_depth, -beta, -alpha, ply + 1, child_ext, True, False)
             self._pop()
@@ -907,6 +963,19 @@ class Engine6:
             self._tt_store(key, depth, best_score, flag, best_move, static, ply)
         return best_score
 
+    @staticmethod
+    def _tactical(board: chess.Board, move: chess.Move) -> bool:
+        """Cheap signal on the position after ``move``: it lands next to the enemy king
+        (Chebyshev distance <= 2) or pushes a pawn to its 5th rank or beyond."""
+        to = move.to_square
+        king = board.king(board.turn)
+        if king is not None and chess.square_distance(to, king) <= 2:
+            return True
+        if (board.pawns >> to) & 1:
+            rank = to >> 3
+            return (rank if not board.turn else 7 - rank) >= 4
+        return False
+
     def _probcut(
         self,
         depth: int,
@@ -920,7 +989,7 @@ class Engine6:
         pc_beta = beta + params[1]
         captures = sorted(board.generate_legal_captures(), key=lambda m: -_mvv_lva(board, m))
         for move in captures:
-            if see(board, move) < params[1] // 2:
+            if not self._see_ge(board, move, params[1] // 2):
                 continue
             self._push(move, ply)
             value = -self._quiesce(-pc_beta, -pc_beta + 1, ply + 1, 0)
@@ -1010,7 +1079,7 @@ class Engine6:
                     victim = board.piece_type_at(move.to_square) or chess.PAWN
                     if stand + VALUES[victim] + delta <= alpha:
                         continue
-                if qcfg.see_prune and see(board, move) < 0:
+                if qcfg.see_prune and not self._see_ge(board, move, 0):
                     continue
             self._push(move, ply)
             score = -self._quiesce(-beta, -alpha, ply + 1, qply + 1)
@@ -1024,6 +1093,12 @@ class Engine6:
         return best
 
     # --------------------------------------------------------------- ordering
+    def _see_ge(self, board: chess.Board, move: chess.Move, threshold: int) -> bool:
+        """SEE of ``move`` >= ``threshold`` (threshold SEE, or the full swap list)."""
+        if self.config.fast_see:
+            return see_ge(board, move, threshold)
+        return see(board, move) >= threshold
+
     def _staged(
         self,
         board: chess.Board,
@@ -1125,7 +1200,7 @@ class Engine6:
         if VALUES[victim] < VALUES[attacker]:
             order = self.config.capture_order
             if order == "see":
-                losing = see(board, move) < 0
+                losing = not self._see_ge(board, move, 0)
             elif order == "attacked":
                 losing = board.is_attacked_by(not board.turn, move.to_square)
         return value, losing
@@ -1401,6 +1476,51 @@ def see(board: chess.Board, move: chess.Move) -> int:
     for index in range(len(gains) - 1, 0, -1):
         gains[index - 1] = -max(-gains[index - 1], gains[index])
     return gains[0]
+
+
+def see_ge(board: chess.Board, move: chess.Move, threshold: int) -> bool:
+    """True when the static exchange on ``move`` gains at least ``threshold`` centipawns.
+
+    Stockfish's threshold swap loop: it stops as soon as the outcome against the threshold
+    is known, without building the whole gain list. Promotions and en passant use ``see``.
+    """
+    if move.promotion or board.is_en_passant(move):
+        return see(board, move) >= threshold
+    frm, to = move.from_square, move.to_square
+    mover = board.piece_type_at(frm)
+    if mover is None:
+        return 0 >= threshold
+    swap = VALUES[board.piece_type_at(to) or 0] - threshold
+    if swap < 0:
+        return False
+    swap = VALUES[mover] - swap
+    if swap <= 0:
+        return True
+    occupied = board.occupied ^ chess.BB_SQUARES[frm] ^ chess.BB_SQUARES[to]
+    stm = board.turn
+    result = 1
+    attackers_mask = board.attackers_mask
+    pieces_mask = board.pieces_mask
+    while True:
+        stm = not stm
+        attackers = attackers_mask(stm, to, occupied) & occupied
+        if not attackers:
+            break
+        result ^= 1
+        for piece_type in (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN):
+            candidates = attackers & pieces_mask(piece_type, stm)
+            if candidates:
+                break
+        else:
+            # Only the king can recapture: legal only if the other side has no attacker left.
+            if attackers_mask(not stm, to, occupied) & occupied:
+                return not result
+            return bool(result)
+        swap = VALUES[piece_type] - swap
+        if swap < result:
+            break
+        occupied ^= candidates & -candidates
+    return bool(result)
 
 
 def _first(item: tuple[int, chess.Move]) -> int:

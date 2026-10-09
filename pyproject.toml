@@ -51,10 +51,10 @@ modules = [
     "ai.mcts",
     "ai.deep_rl",
     "ai.benchmarks",
-    "ai.bench5",
-    "ai.bench6",
-    "ai.bench7",
-    "ai.bench8",
+    "ai.benchmarks_extension.bench5",
+    "ai.benchmarks_extension.bench6",
+    "ai.benchmarks_extension.bench7",
+    "ai.benchmarks_extension.bench8",
 ]
 
 [[tool.importlinter.contracts]]
@@ -68,8 +68,8 @@ forbidden_modules = [
     "ai.mcts",
     "ai.deep_rl",
     "ai.benchmarks",
-    "ai.bench5",
-    "ai.bench6",
-    "ai.bench7",
-    "ai.bench8",
+    "ai.benchmarks_extension.bench5",
+    "ai.benchmarks_extension.bench6",
+    "ai.benchmarks_extension.bench7",
+    "ai.benchmarks_extension.bench8",
 ]

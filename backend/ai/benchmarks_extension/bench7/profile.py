@@ -5,8 +5,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.bench7.evaluation import EvalConfig6, MopUp6
-from ai.bench7.search import Lmr6, NullMove6, Quiescence6, SearchConfig6, TimeConfig6
+from ai.benchmarks_extension.bench7.evaluation import EvalConfig6, MopUp6
+from ai.benchmarks_extension.bench7.search import (
+    Lmr6,
+    NullMove6,
+    Quiescence6,
+    SearchConfig6,
+    TimeConfig6,
+)
 
 
 @dataclass(frozen=True)

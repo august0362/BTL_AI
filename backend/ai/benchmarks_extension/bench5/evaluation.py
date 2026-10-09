@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import chess
 
-from ai.bench5.tables import KING_ENDGAME_TABLE, MOBILITY_WEIGHTS, PST_TABLES
+from ai.benchmarks_extension.bench5.tables import KING_ENDGAME_TABLE, MOBILITY_WEIGHTS, PST_TABLES
 
 MAX_PHASE = 24
 PIECE_TYPES = (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING)
