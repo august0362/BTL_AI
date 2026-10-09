@@ -58,7 +58,11 @@ class App:
             self.data_dir / "ranking.json",
             elo_initial=ranking_cfg.get("elo_initial", 1200),
             elo_k=ranking_cfg.get("elo_k", 32),
-            known_ids=registry.list_bots(include_benchmarks=True) + ["human"],
+            known_ids=registry.list_bots(
+                include_benchmarks=True,
+                max_benchmark_level=registry.benchmark_level(self.config),
+            )
+            + ["human"],
         )
         self.history = History(self.data_dir / "history", history_cfg.get("max_games", 20))
         self.tournament_settings = TournamentConfig.from_config(self.config)
@@ -68,7 +72,9 @@ class App:
         self.tournament = TournamentController(
             self.config, settings=self.tournament_settings, history=self.tournament_history
         )
-        self._translator = Translator(self.config.get("ui", {}).get("language", "vi"))
+        self._translator = Translator(
+            self.config.get("ui", {}).get("language", "vi"), overrides=self._name_overrides()
+        )
         window = self.config.get("window", {})
         self.window_size = self._default_window_size(window)
         self.window = pygame.display.set_mode(self.window_size, pygame.RESIZABLE)
@@ -122,6 +128,15 @@ class App:
     def current_screen_name(self) -> str:
         """Return the name of the visible screen."""
         return self._current_screen_name
+
+    def _name_overrides(self) -> dict[str, str]:
+        """Bot names set in ``[bots.<id>] display_name`` replace the locale names."""
+        overrides = {}
+        for bot_id, table in self.config.get("bots", {}).items():
+            name = table.get("display_name") if isinstance(table, dict) else None
+            if isinstance(name, str) and name.strip():
+                overrides[f"players.{bot_id}"] = name.strip()
+        return overrides
 
     def _bot_config(self, bot_id: str) -> dict[str, Any]:
         """Return a bot-specific configuration table."""
@@ -334,7 +349,7 @@ class App:
         if language not in ("vi", "en"):
             raise ValueError("language must be 'vi' or 'en'")
         self._save_ui("language", language)
-        self._translator = Translator(language)
+        self._translator = Translator(language, overrides=self._name_overrides())
         pygame.display.set_caption(self._translator.t("app.title"))
         self.goto(self._current_screen_name)
 

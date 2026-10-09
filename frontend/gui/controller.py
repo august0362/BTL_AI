@@ -34,6 +34,10 @@ class ControllerSnapshot:
     waiting_for_human: bool
     finished: bool
     paused: bool
+    # Seating of the current game: True when the player passed as ``white`` has White
+    # (Best of 3 swaps colours in game 2), and the colour of the bot that is thinking.
+    first_is_white: bool = True
+    thinking_color: chess.Color | None = None
 
 
 class _TrackedPlayer:
@@ -51,11 +55,14 @@ class _TrackedPlayer:
 
     def select_move(self, board: chess.Board) -> chess.Move:
         is_human = isinstance(self._player, HumanPlayer)
-        with self._controller._lock:
+        controller = self._controller
+        with controller._lock:
+            controller._first_is_white = (self is controller._white) == (board.turn == chess.WHITE)
             if is_human:
-                self._controller._waiting_for_human = True
+                controller._waiting_for_human = True
             else:
-                self._controller._thinking = True
+                controller._thinking = True
+                controller._thinking_color = board.turn
         try:
             return self._player.select_move(board)
         finally:
@@ -131,6 +138,8 @@ class GameController:
         self._finished_games: list[GameRecord] = []
         self._series_result: SeriesResult | None = None
         self._thinking = False
+        self._thinking_color: chess.Color | None = None
+        self._first_is_white = True
         self._waiting_for_human = False
         self._finished = False
         self._paused = False
@@ -163,6 +172,8 @@ class GameController:
                 waiting_for_human=self._waiting_for_human,
                 finished=self._finished,
                 paused=self._paused,
+                first_is_white=self._first_is_white,
+                thinking_color=self._thinking_color if self._thinking else None,
             )
 
     def submit_human_move(self, move: chess.Move) -> None:
@@ -303,5 +314,8 @@ class GameController:
             self._finished_games.append(record)
             if len(self._finished_games) < self._n_games:
                 self._game_index = len(self._finished_games) + 1
+                # Best of 3: game 2 always swaps colours; game 3 is set by its first move.
+                if self._game_index == 2:
+                    self._first_is_white = False
                 self._board = chess.Board()
                 self._moves = []

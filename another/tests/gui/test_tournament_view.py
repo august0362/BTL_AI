@@ -72,3 +72,25 @@ def test_provisional_standings_seed_every_bot_in_order():
     assert [row.bot_id for row in rows] == ["bench_random", "mcts", "deep_rl"]
     assert [row.rank for row in rows] == [1, 2, 3]
     assert all(row.points == 0.0 and row.games == 0 and row.score_pct == 0.0 for row in rows)
+
+
+def test_sort_rows_by_column_keeps_rank_numbers():
+    from gui.tournament_view import TournamentRow, sort_rows
+
+    rows = [
+        TournamentRow(1, "a", "A", 4, 3, 0, 1, 3.0, 10.0, 3.1),
+        TournamentRow(2, "b", "B", 4, 1, 3, 0, 2.5, 30.0, 2.4),
+        TournamentRow(3, "c", "C", 4, 0, 1, 3, 0.5, 20.0, 0.5),
+    ]
+    assert [row.player_id for row in sort_rows(rows, "total")] == ["a", "b", "c"]
+    assert [row.player_id for row in sort_rows(rows, "draws")] == ["b", "c", "a"]
+    assert [row.player_id for row in sort_rows(rows, "think_time_s")] == ["b", "c", "a"]
+    assert [row.rank for row in sort_rows(rows, "losses")] == [3, 1, 2]
+
+
+def test_format_duration():
+    from gui.tournament_view import format_duration
+
+    assert format_duration(0) == "0:00"
+    assert format_duration(65.4) == "1:05"
+    assert format_duration(3_725) == "1:02:05"

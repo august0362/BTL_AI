@@ -27,6 +27,8 @@ class TournamentSnapshot:
     error: str | None
     plies_current: int = 0
     plies_limit: int = 0
+    elapsed_s: float = 0.0  # time since the tournament started
+    eta_s: float | None = None  # estimated time left (None while not yet known)
 
     @property
     def progress(self) -> float:
@@ -67,7 +69,7 @@ class TournamentController:
         self._games_done = 0
         self._plies_current = 0
         self._games_total = (
-            len(tuple(combinations(self.settings.bots, 2))) * self.settings.matches_per_pair
+            2 * len(tuple(combinations(self.settings.bots, 2))) * self.settings.matches_per_pair
         )
         self._current_pair: tuple[str, str] | None = None
 
@@ -118,8 +120,12 @@ class TournamentController:
             games_total = self._games_total
             plies_current = self._plies_current
             current_pair = self._current_pair
+        elapsed_s, eta_s = 0.0, None
         if running and runner is not None:
+            elapsed_s, eta_s = runner.time_status()
             standings = runner.standings()
+            # The game being played now, challenger (White) first.
+            current_pair = runner.current_game
         elif result is not None:
             standings = result.standings
         else:
@@ -136,6 +142,8 @@ class TournamentController:
             error=error,
             plies_current=plies_current,
             plies_limit=self.settings.max_plies,
+            elapsed_s=elapsed_s,
+            eta_s=eta_s,
         )
 
     def _on_progress(self, done: int, total: int, pair: tuple[str, str] | None) -> None:
@@ -164,6 +172,8 @@ class TournamentController:
             on_progress=self._on_progress,
             on_ply=self._on_ply,
             create_bot=self._create_bot,
+            measure_memory=self.settings.measure_memory,
+            eta_smoothing=self.settings.eta_smoothing,
         )
         with self._lock:
             self._runner = runner

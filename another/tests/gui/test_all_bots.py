@@ -28,6 +28,16 @@ BOT_IDS = (
     "bench_alphabeta3",
     "bench_alphabeta_tt",
     "bench_alphabeta_custom",
+    "bench5_gpt",
+    "bench5_gemini",
+    "bench5_deepseek",
+    "bench5_grok",
+    "bench5_hybrid",
+    "bench6_gpt",
+    "bench6_gemini",
+    "bench6_grok",
+    "bench6_deepseek",
+    "bench7",
 )
 
 
@@ -36,6 +46,8 @@ def app(tmp_path):
     """Create an isolated application with debug bots disabled by default."""
     config = load_config(local_path=None)
     config["ui"]["show_debug_bots"] = False
+    # BOT_IDS lists generations up to 7; pin it so the test ignores the chosen display level.
+    config.setdefault("benchmarks", {})["max_level"] = 7
     instance = App(config, tmp_path / "data", tmp_path / "local.toml")
     yield instance
     instance.quit()
@@ -77,17 +89,17 @@ def _button_rects(screen) -> list:
     return [button.rect for button in buttons]
 
 
-def test_ranking_contains_eight_bots_and_human_at_initial_elo(app: App) -> None:
+def test_ranking_contains_all_bots_and_human_at_initial_elo(app: App) -> None:
     """The Elo table starts with each playable bot and human, without baseline."""
     table = app.ranking.table()
     assert {player_id for player_id, _ in table} == {*BOT_IDS, "human"}
-    assert len(table) == 10
+    assert len(table) == len(BOT_IDS) + 1
     assert all(stats.elo == app.ranking.elo_initial for _, stats in table)
 
 
 @pytest.mark.parametrize("screen_name", ["setup_human", "setup_bots"])
 def test_setup_screens_list_all_bots_and_fit_buttons(app: App, screen_name: str) -> None:
-    """Both setup screens fit the nine standard bots and optional debug bot."""
+    """Both setup screens fit every standard bot and the optional debug bot."""
     debug_ids = [*BOT_IDS[:4], "random", *BOT_IDS[4:]]
     for debug_enabled, expected in ((False, list(BOT_IDS)), (True, debug_ids)):
         app.config["ui"]["show_debug_bots"] = debug_enabled

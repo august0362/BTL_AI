@@ -58,3 +58,12 @@ def test_real_files():
     assert tr.t("menu.quit") == "Thoát"
     tr.set_language("en")
     assert tr.t("menu.quit") == "Quit"
+
+
+def test_overrides_win_in_every_language(tdir):
+    """Bot names from ``[bots.<id>] display_name`` replace the locale strings."""
+    tr = i18n.Translator("vi", directory=tdir, overrides={"menu.quit": "Exit now"})
+    assert tr.t("menu.quit") == "Exit now"
+    tr.set_language("en")
+    assert tr.t("menu.quit") == "Exit now"
+    assert tr.t("game.thinking", name="A") == "A is thinking"

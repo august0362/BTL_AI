@@ -123,9 +123,12 @@ class TournamentHistoryScreen(Screen):
             canvas.blit(
                 get_font(12, bold=True).render(translator.t(key), True, roles["accent"]), (x, 120)
             )
-        font = get_font(12)
-        for index, row in enumerate(tournament_rows(result.standings, translator)[:9]):
-            y = 150 + index * 22
+        rows = tournament_rows(result.standings, translator)[:20]
+        compact = len(rows) > 9
+        dense = len(rows) > 14
+        font = get_font(10 if dense else 11 if compact else 12)
+        for index, row in enumerate(rows):
+            y = 146 + index * (13 if dense else 14 if compact else 22)
             values = (
                 str(row.rank),
                 row.name,
@@ -139,18 +142,25 @@ class TournamentHistoryScreen(Screen):
             get_font(14, bold=True).render(
                 translator.t("tournament_history.matchups"), True, roles["text"]
             ),
-            (340, 350),
+            (340, self._matchups_y(result) - 50),
         )
+
+    def _matchups_y(self, result) -> int:
+        """Top of the matchup list; long standings (> 14 bots) push it down."""
+        return 448 if len(result.standings) > 14 else 400
 
     def _draw_matchups(self, canvas: Render, result) -> None:
         roles = self.app.theme.roles
         translator = self.app.translator
         font = get_font(12)
         visible = result.matchups[self.matchup_offset : self.matchup_offset + self.VISIBLE_MATCHUPS]
+        top = self._matchups_y(result)
+        step = 20 if top > 400 else 24
+        self.scroll_up.y = self.scroll_down.y = top - 22
         for index, matchup in enumerate(visible):
             canvas.blit(
                 font.render(format_matchup(matchup, translator), True, roles["text"]),
-                (340, 400 + index * 24),
+                (340, top + index * step),
             )
         self._draw_scroll_button(canvas, self.scroll_up, up=True)
         self._draw_scroll_button(canvas, self.scroll_down, up=False)

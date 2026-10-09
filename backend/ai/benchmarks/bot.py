@@ -153,7 +153,7 @@ class BenchmarkAlphaBetaTTBot(_SearchBenchmarkBot):
 
 
 class BenchmarkAlphaBetaCustomBot(BenchmarkAlphaBetaTTBot):
-    """Benchmark 4: Benchmark 3 + ``advanced`` eval, check extensions and (depth >= 4) pruning."""
+    """Benchmark 4: Benchmark 3 + ``advanced`` eval, check extensions, null-move and LMR."""
 
     bot_id = "bench_alphabeta_custom"
     display_name = "Benchmark 4 - Alpha-Beta Custom"
