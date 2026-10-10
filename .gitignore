@@ -21,6 +21,8 @@ backend/ai/*/weights/
 kaggle.json
 wandb/
 runs/
+# notebook, zip code và kết quả train Deep RL trên Kaggle (chỉ giữ trên máy)
+backend/ai/deep_rl/kaggle/*
 
 # ---------- Python ----------
 __pycache__/
