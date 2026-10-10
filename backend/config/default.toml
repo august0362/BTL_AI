@@ -45,8 +45,8 @@ scale = 8.0                # giá trị thanh = tanh(chênh lệch quân / scale
 
 [bots.deep_rl]
 # display_name = "Deep RL"   # bỏ # để đặt tên riêng (mặc định: tên trong locale)
-weights_url = ""           # link asset trên GitHub Release
-weights_sha256 = ""
+weights_url = "https://github.com/august0362/BTL_AI/releases/download/deeprl-v1.0/deeprl-v1.0.pt"   # link asset trên GitHub Release
+weights_sha256 = "a523ce212cb9cabb958b8f787dcb711a395772c268fcf4d2f811931d51ba1b39"
 device = "cpu"
 
 # ---------- Bot benchmark: bật/tắt theo thế hệ ----------

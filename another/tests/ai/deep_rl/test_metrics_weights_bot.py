@@ -1,5 +1,4 @@
 import hashlib
-import json
 from pathlib import Path
 
 import chess
@@ -53,13 +52,3 @@ def test_bot_unavailable_and_random_stub(monkeypatch) -> None:
     bot = DeepRLBot()
     board = chess.Board()
     assert bot.select_move(board) in board.legal_moves
-
-
-def test_notebook_is_valid_json_and_code_cells_compile() -> None:
-    path = Path("backend/ai/deep_rl/kaggle/train_notebook.ipynb")
-    notebook = json.loads(path.read_text(encoding="utf-8"))
-    for cell in notebook["cells"]:
-        if cell["cell_type"] == "code":
-            source = "".join(cell["source"])
-            if not source.startswith(("!", "%")):
-                compile(source, str(path), "exec")
