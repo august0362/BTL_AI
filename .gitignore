@@ -80,3 +80,5 @@ backend/ai/benchmarks_extension/bench9/engine/
 
 # Công cụ đo sức mạnh Benchmark 9: chỉ để kiểm tra trên máy
 another/tools/bench9_strength.py
+
+AGENTS.md
