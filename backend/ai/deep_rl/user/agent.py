@@ -34,11 +34,34 @@ def bellman_targets(
     next_q: torch.Tensor,
     next_mask: torch.Tensor,
     gamma: float,
+    steps: torch.Tensor | None = None,
+    online_q: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """``y = r − γ · max Q(s')`` trên các nước hợp lệ; ``y = r`` khi ``done``."""
-    best_next = masked_q(next_q, next_mask).max(dim=1).values
+    """Tính mục tiêu Bellman negamax cho các mẫu một hoặc nhiều bước."""
+    if online_q is None:
+        best_next = masked_q(next_q, next_mask).max(dim=1).values
+    else:
+        actions = masked_q(online_q, next_mask).argmax(dim=1)
+        best_next = next_q.gather(1, actions[:, None]).squeeze(1)
     best_next = torch.where(dones > 0, torch.zeros_like(best_next), best_next)
-    return rewards - gamma * best_next
+    if steps is None:
+        steps = torch.ones_like(rewards)
+    discounts = torch.pow(torch.full_like(rewards, -gamma), steps)
+    return rewards + discounts * best_next
+
+
+def margin_loss(
+    q: torch.Tensor,
+    legal_masks: torch.Tensor,
+    expert_actions: torch.Tensor,
+    margin: float,
+) -> torch.Tensor:
+    """Tính loss biên lớn trên các nước hợp lệ của chuyên gia."""
+    actions = expert_actions.long()
+    alternatives = torch.arange(q.shape[1], device=q.device)[None, :] != actions[:, None]
+    candidates = q + margin * alternatives
+    best = candidates.masked_fill(~legal_masks.bool(), -torch.inf).max(dim=1).values
+    return (best - q.gather(1, actions[:, None]).squeeze(1)).clamp_min(0).mean()
 
 
 class Agent:
@@ -54,6 +77,9 @@ class Agent:
         huber_delta: float = 1.0,
         grad_clip: float = 10.0,
         device: str | torch.device = "cpu",
+        margin: float = 0.05,
+        margin_weight: float = 1.0,
+        double_dqn: int = 0,
     ) -> None:
         self.device = torch.device(device)
         self.online = model.to(self.device)
@@ -63,6 +89,9 @@ class Agent:
         self.tau = tau
         self.huber_delta = huber_delta
         self.grad_clip = grad_clip
+        self.margin = margin
+        self.margin_weight = margin_weight
+        self.double_dqn = bool(double_dqn)
         self.optimizer = torch.optim.Adam(self.online.parameters(), lr=lr)
 
     @torch.no_grad()
@@ -76,9 +105,17 @@ class Agent:
         bốc theo softmax(Q/τ). Chỉ chọn trong các nước hợp lệ."""
         q = self.online(torch.as_tensor(states, device=self.device))
         q = masked_q(q, torch.as_tensor(masks, device=self.device))
-        if temperature is None:
+        if temperature is None or temperature <= 0:
             return q.argmax(dim=1).cpu().numpy()
-        probs = torch.softmax(q / temperature, dim=1)
+        legal = torch.as_tensor(masks, device=self.device)
+        legal_q = q.masked_fill(~legal, 0.0)
+        count = legal.sum(dim=1, keepdim=True).clamp_min(1)
+        mean = legal_q.sum(dim=1, keepdim=True) / count
+        centered = (q - mean).masked_fill(~legal, 0.0)
+        variance = centered.square().sum(dim=1, keepdim=True) / count
+        normalized = centered / (variance.sqrt() + 1e-6)
+        normalized = normalized.masked_fill(~legal, MASK_VALUE)
+        probs = torch.softmax(normalized / temperature, dim=1)
         return torch.multinomial(probs, 1).squeeze(1).cpu().numpy()
 
     def select_action(self, board: chess.Board, training: bool = False) -> chess.Move:
@@ -86,29 +123,80 @@ class Agent:
         del training
         return DQNPolicy(self.online, self.device).select_move(board)
 
-    def update(self, batch: dict[str, np.ndarray]) -> dict[str, float]:
-        """Một bước gradient trên batch từ ``ReplayBuffer.sample``; trả về loss và Q trung bình."""
+    def update(
+        self,
+        batch: dict[str, np.ndarray],
+        expert_batch: dict[str, np.ndarray] | None = None,
+    ) -> dict[str, float]:
+        """Cập nhật TD trên replay và tùy chọn thêm loss biên từ chuyên gia."""
         device = self.device
-        states = torch.as_tensor(batch["states"], device=device)
-        actions = torch.as_tensor(batch["actions"], device=device)
+        expert_count = 0 if expert_batch is None else len(expert_batch["actions"])
+        states_np = batch["states"]
+        if expert_batch is not None:
+            states_np = np.concatenate((states_np, expert_batch["states"]))
+        states = torch.as_tensor(states_np, device=device)
+        actions_np = batch["actions"]
+        if expert_batch is not None:
+            actions_np = np.concatenate((actions_np, expert_batch["actions"]))
+        actions = torch.as_tensor(actions_np, device=device)
+        q_all = self.online(states)
+        q_taken = q_all.gather(1, actions[:, None]).squeeze(1)
+        batch_count = len(batch["actions"])
         rewards = torch.as_tensor(batch["rewards"], device=device)
         next_states = torch.as_tensor(batch["next_states"], device=device)
         next_masks = torch.as_tensor(batch["next_masks"], device=device)
         dones = torch.as_tensor(batch["dones"], device=device)
-
-        q_taken = self.online(states).gather(1, actions[:, None]).squeeze(1)
-        with torch.no_grad():
-            targets = bellman_targets(
-                rewards, dones, self.target(next_states), next_masks, self.gamma
+        steps = torch.as_tensor(
+            batch.get("steps", np.ones(len(batch["actions"]))),
+            device=device,
+            dtype=torch.int64,
+        )
+        if expert_batch is not None:
+            rewards = torch.cat((rewards, torch.as_tensor(expert_batch["rewards"], device=device)))
+            next_states = torch.cat(
+                (next_states, torch.as_tensor(expert_batch["next_states"], device=device))
             )
-        loss = functional.huber_loss(q_taken, targets, delta=self.huber_delta)
+            next_masks = torch.cat(
+                (next_masks, torch.as_tensor(expert_batch["next_masks"], device=device))
+            )
+            dones = torch.cat((dones, torch.as_tensor(expert_batch["dones"], device=device)))
+            expert_steps = torch.as_tensor(
+                expert_batch.get("steps", np.ones(len(expert_batch["actions"]))),
+                device=device,
+                dtype=torch.int64,
+            )
+            steps = torch.cat((steps, expert_steps))
+        with torch.no_grad():
+            online_next = self.online(next_states) if self.double_dqn else None
+            targets = bellman_targets(
+                rewards,
+                dones,
+                self.target(next_states),
+                next_masks,
+                self.gamma,
+                steps,
+                online_next,
+            )
+        td_loss = functional.huber_loss(q_taken, targets, delta=self.huber_delta)
+        if expert_batch is None or expert_count == 0:
+            expert_loss = torch.zeros((), device=device)
+        else:
+            masks = torch.as_tensor(expert_batch["masks"], device=device)
+            expert_actions = torch.as_tensor(expert_batch["actions"], device=device)
+            expert_loss = margin_loss(q_all[batch_count:], masks, expert_actions, self.margin)
+        loss = td_loss + self.margin_weight * expert_loss
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
         nn.utils.clip_grad_norm_(self.online.parameters(), self.grad_clip)
         self.optimizer.step()
         self.soft_update()
-        return {"loss": float(loss.item()), "q_mean": float(q_taken.mean().item())}
+        return {
+            "loss": float(loss.item()),
+            "td_loss": float(td_loss.item()),
+            "margin_loss": float(expert_loss.item()),
+            "q_mean": float(q_taken.mean().item()),
+        }
 
     @torch.no_grad()
     def soft_update(self) -> None:

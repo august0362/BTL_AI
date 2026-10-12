@@ -11,7 +11,7 @@ from ai.benchmarks_extension.bench5.evaluation import Evaluator5
 from ai.benchmarks_extension.bench5.profiles import PROFILES
 from ai.benchmarks_extension.bench5.search import see
 
-B5_IDS = ["bench5_gpt", "bench5_gemini", "bench5_deepseek", "bench5_grok", "bench5_hybrid"]
+B5_IDS = ["bench5_gpt", "bench5_deepseek", "bench5_hybrid"]
 MATE_IN_ONE = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"
 MATE_IN_TWO = "r5k1/5ppp/8/8/8/8/4RPPP/4R1K1 w - - 0 1"  # 1.Re8+ Rxe8 2.Rxe8#
 MIDDLEGAME = "r2q1rk1/1b1nbppp/p2ppn2/1p6/3NP3/1BN1BP2/PPPQ2PP/2KR3R w - - 0 12"
@@ -19,7 +19,7 @@ MIDDLEGAME = "r2q1rk1/1b1nbppp/p2ppn2/1p6/3NP3/1BN1BP2/PPPQ2PP/2KR3R w - - 0 12"
 
 def test_all_five_profiles_are_registered_benchmarks():
     assert all(bot_id in registry.BENCHMARK_BOTS for bot_id in B5_IDS)
-    assert sorted(PROFILES) == sorted(["gpt", "gemini", "deepseek", "grok", "hybrid"])
+    assert sorted(PROFILES) == sorted(["gpt", "deepseek", "hybrid"])
     for bot_id in B5_IDS:
         bot = registry.create_bot(bot_id, {"depth": 1})
         assert bot.bot_id == bot_id

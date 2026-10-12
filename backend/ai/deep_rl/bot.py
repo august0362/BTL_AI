@@ -18,7 +18,7 @@ class DeepRLBot(RandomBaselineBot):
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
-        settings = self.config.get("bots", {}).get("deep_rl", self.config)
+        settings = self.config.get("bots", {}).get(self.bot_id, self.config)
         self.policy = None
         self.is_baseline = False
         try:
@@ -26,11 +26,16 @@ class DeepRLBot(RandomBaselineBot):
                 settings.get("weights_url", ""),
                 settings.get("weights_sha256", ""),
             )
-            self.policy = load_policy(weights_path, device=settings.get("device", "cpu"))
+            self.policy = load_policy(
+                weights_path,
+                device=settings.get("device", "cpu"),
+                depth=int(settings.get("depth", 3)),
+                max_think_time_s=float(settings.get("max_think_time_s", 1.0)),
+            )
         except NotImplementedError:
             self.is_baseline = True
         except Exception as exc:
-            raise BotUnavailableError(f"deep_rl: không tải được trọng số: {exc}") from exc
+            raise BotUnavailableError(f"{self.bot_id}: không tải được trọng số: {exc}") from exc
 
     def select_move(self, board: chess.Board) -> chess.Move:
         """Return a legal move selected by the configured policy."""
@@ -39,5 +44,5 @@ class DeepRLBot(RandomBaselineBot):
         move = self.policy.select_move(board.copy())
         if move not in board.legal_moves:
             raise ValueError(f"Deep RL policy returned illegal move: {move}")
-        self.last_search_info = {}
+        self.last_search_info = dict(getattr(self.policy, "last_info", {}))
         return move

@@ -58,7 +58,7 @@ CI kiểm tra tự động (§9); vi phạm thì CI đỏ, không merge được
 ```text
 BTL_AI/
 ├── backend/
-│   ├── ai/            # bot, lớp nền, registry; benchmarks/ (B1–B4), benchmarks_extension/ (B5–B8: bench5/ … bench8/, mỗi thế hệ một package)
+│   ├── ai/            # bot, lớp nền, registry; benchmarks/ (B1–B4), benchmarks_extension/ (B5–B9: bench5/ … bench9/, mỗi thế hệ một package)
 │   ├── config/        # default.toml (commit) + local.toml (máy cá nhân)
 │   ├── core/          # trạng thái ván, kiểu dữ liệu
 │   └── tournament/    # trận đấu, lịch sử, xếp hạng
@@ -110,10 +110,11 @@ DEBUG_BOTS = {"random": "ai.random_bot.bot:RandomBot"}
 BENCHMARK_BOTS = {   # opt-in, xem §4.9
     "bench_random", "bench_alphabeta_material", "bench_alphabeta3", "bench_alphabeta_tt",
     "bench_alphabeta_custom",                       # ai.benchmarks.bot
-    "bench5_gpt|gemini|deepseek|grok|hybrid",       # ai.benchmarks_extension.bench5.bot
-    "bench6_gpt|gemini|grok|deepseek",              # ai.benchmarks_extension.bench6.bot
+    "bench5_gpt|deepseek|hybrid",                   # ai.benchmarks_extension.bench5.bot
+    "bench6_gpt|gemini|deepseek",                   # ai.benchmarks_extension.bench6.bot
     "bench7",                                       # ai.benchmarks_extension.bench7.bot (Dragon)
     "bench8_luna",                                  # ai.benchmarks_extension.bench8.bot (Luna)
+    "bench_super_alphabeta_nnue",                   # ai.benchmarks_extension.bench9.bot (Stockfish 19)
 }
 BENCHMARK_LEVELS: dict[str, float]   # thế hệ: 1, 1.5, 2, 3, 4, 5, 6, 7, 8
 def benchmark_level(config) -> float | None: ...          # đọc [benchmarks] max_level
@@ -125,7 +126,7 @@ def create_bot(bot_id: str, config: dict | None = None) -> BaseBot: ...   # impo
 
 Lớp chính mỗi bot ở `backend/ai/<bot>/bot.py`.
 
-**Bot benchmark (2026-10-07, cập nhật 2026-10-08):** `BENCHMARK_BOTS` chỉ trả khi `list_bots(include_benchmarks=True)`; mặc định `list_bots()` không đổi. GUI gọi `list_bots(include_debug=show_debug_bots, include_benchmarks=True, max_benchmark_level=...)` nên Người vs Bot, Bot vs Bot, Xếp hạng Elo và Xếp hạng AI có 4 bot thành viên + mọi benchmark có thế hệ ≤ `max_level` (mặc định 7 → 19 bot; 8 → 20 bot). `baseline` (`BASELINE_BOTS`) **không** hiện trên GUI. `create_bot` nhận mọi khóa benchmark.
+**Bot benchmark (2026-10-07, cập nhật 2026-10-08):** `BENCHMARK_BOTS` chỉ trả khi `list_bots(include_benchmarks=True)`; mặc định `list_bots()` không đổi. GUI gọi `list_bots(include_debug=show_debug_bots, include_benchmarks=True, max_benchmark_level=...)` nên Người vs Bot, Bot vs Bot, Xếp hạng Elo và Xếp hạng AI có 4 bot thành viên + mọi benchmark có thế hệ ≤ `max_level` (7 → 16 bot; 8 → 17 bot; 9 → 18 bot — sau khi bỏ bot Grok B5/B6 và B5 Gemini, 2026-10-11; màn chọn bot, Elo, Xếp hạng AI và lịch sử giải chứa tối đa 25 bot). `baseline` (`BASELINE_BOTS`) **không** hiện trên GUI. `create_bot` nhận mọi khóa benchmark.
 
 **Baseline ngẫu nhiên (2026-10-04):** bot chưa có code thật thì đi nước hợp lệ ngẫu nhiên, để GUI và giải luôn đủ 4 bot.
 - Lớp chung `backend/ai/baseline.py::RandomBaselineBot(BaseBot)`, `is_baseline = True`, `random.Random(config.get("seed"))` riêng. Đặt ở `backend/ai/` nên các bot được import.
@@ -314,7 +315,7 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 
 ### 4.9 Xếp hạng AI — bot benchmark & giải vòng tròn
 
-**Bot benchmark** là thang phân loại sức mạnh, tách khỏi Elo (§4.7). B1–B4 ở `backend/ai/benchmarks/`; **mỗi thế hệ sau là một package riêng** (`backend/ai/benchmarks_extension/bench5/` … `bench8/`), tự chứa engine, eval, bảng số, profile, lớp bot, không import package benchmark khác (import-linter kiểm), chỉ nối qua `ai.registry`. **Bật/tắt theo thế hệ:** `[benchmarks] max_level` (4 = B1–B4, 5 = +B5, 6 = +B6, 7 = +B7, 8 = +B8; xóa khóa = hiện tất cả; bot vượt mức bị loại cả khi có trong `tournament.bots`).
+**Bot benchmark** là thang phân loại sức mạnh, tách khỏi Elo (§4.7). B1–B4 ở `backend/ai/benchmarks/`; **mỗi thế hệ sau là một package riêng** (`backend/ai/benchmarks_extension/bench5/` … `bench9/`), tự chứa engine, eval, bảng số, profile, lớp bot, không import package benchmark khác (import-linter kiểm), chỉ nối qua `ai.registry`. **Bật/tắt theo thế hệ:** `[benchmarks] max_level` (4 = B1–B4, 5 = +B5, 6 = +B6, 7 = +B7, 8 = +B8, 9 = +B9; xóa khóa = hiện tất cả; bot vượt mức bị loại cả khi có trong `tournament.bots`).
 
 | id | Tên | Cách chơi |
 |---|---|---|
@@ -323,11 +324,12 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 | `bench_alphabeta3` | B2 · Alpha-Beta 3 | Negamax alpha-beta độ sâu cố định (3), eval `pst`, hòa điểm thì chọn ngẫu nhiên theo `seed` |
 | `bench_alphabeta_tt` | B3 · Alpha-Beta TT | B2 + bảng chuyển vị Zobrist, sắp nước (MVV-LVA, phong cấp, killer), quiescence (chỉ ăn quân, ≤ 8 nửa nước) |
 | `bench_alphabeta_custom` | B4 · Alpha-Beta Custom | B3 + check extension (≤ 2), mobility (mã/tượng 4, xe 2, hậu 1 mỗi ô), null-move (R=2) + LMR (nước yên tĩnh thứ 4 trở đi −1 ply) khi độ sâu còn ≥ 2; eval `advanced` = `pst` + tốt (chồng −15, cô lập −15, thông +5..+100) + an toàn vua trước tàn cuộc (thiếu tốt che −15/cột, cột mở quanh vua −20) + cặp tượng +30 + xe cột mở +20 / nửa mở +10 (bitboard, cache theo tốt và vua; đổi qua `evaluator`) |
-| `bench5_gpt` / `_gemini` / `_deepseek` / `_grok` | B5 · … | Engine PVS dùng hết thời gian (§4.9.1), profile chỉ lấy từ `chatgpt.txt` / `gemini.txt` / `deepseek.txt` / `grok.txt` |
+| `bench5_gpt` / `_deepseek` | B5 · … | Engine PVS dùng hết thời gian (§4.9.1), profile chỉ lấy từ `chatgpt.txt` / `deepseek.txt` (bản Gemini, Grok đã bỏ 2026-10-11) |
 | `bench5_hybrid` | B5 · Tổng hợp | Profile tổng hợp 4 nguồn, chỉnh bằng trận |
-| `bench6_gpt` / `_gemini` / `_grok` / `_deepseek` | B6 · … | Engine PVS chọn lọc (§4.9.2), mỗi bản chỉ theo một file (bản B6) |
+| `bench6_gpt` / `_gemini` / `_deepseek` | B6 · … | Engine PVS chọn lọc (§4.9.2), mỗi bản chỉ theo một file (bản B6) |
 | `bench7` | B7 · Dragon | Tổng hợp 4 thiết kế B6, chọn bằng ablation |
 | `bench8_luna` | B8 · Luna | Lõi Dragon + SEE theo ngưỡng; các phương án khác có công tắc, mặc định tắt (§4.9.3) |
+| `bench_super_alphabeta_nnue` | B9 · Super Alpha-Beta NNUE | **Engine kế thừa:** Stockfish 19 chính thức (GPLv3, NNUE nhúng) qua UCI, 1 luồng, trong trần thời gian (§4.9.5, `documents/bench9/`) |
 
 **B1–B4** (`backend/ai/benchmarks/`):
 
@@ -389,6 +391,15 @@ Kết quả (1 s/nước, khai cuộc 2 nửa nước, đổi màu theo cặp):
 - Ghép 3 phương án dương, 100 ván: **−10 [−62, +41]**. Lần thử trước (cắt tỉa theo độ tin cậy, contempt động, nghĩ lâu hơn, bỏ ProbCut) cũng thua (−45 / 100 ván).
 - 400 ván/phương án: xác minh LMR −7 [−33, +19], cổng an toàn +14 [−12, +40], mốc 150 + KPK +21 [−5, +47] — không phương án nào có cận dưới > 0.
 - **Kết luận:** B8 = Dragon + FastCore (chơi như B7, nhanh hơn chút), **chưa mạnh hơn B7**; mặc định ẩn (`max_level = 7`).
+
+#### 4.9.5 Benchmark 9 "Super Alpha-Beta NNUE" (2026-10-11)
+
+Khác B5–B8: **không tự viết engine**, mà chạy Stockfish 19 chính thức (tag `sf_19`, mạng `nn-1a298aa575a0.nnue` nhúng trong binary) qua UCI bằng `chess.engine`. Package `ai.benchmarks_extension.bench9`: `provenance.py` (bản ghim + SHA-256), `engine.py` (`UciEngine`: hạn chót cứng, đo RAM tiến trình con, đóng khi thoát), `bot.py` (`SuperAlphaBetaNNUEBot`), `install.py` (`python -m ai.benchmarks_extension.bench9.install`; binary ở `bench9/engine/`, gitignore).
+- Thời gian: `movetime = max_think_time_s − time_safety_s (0,03) − độ trễ UCI lớn nhất của 12 nước gần nhất` (đo thật, khởi đầu 30 ms). Gửi toàn bộ lịch sử ván. Treo quá `movetime + 1 s` → giết tiến trình.
+- Lỗi khởi tạo (thiếu binary, sai kiến trúc, NNUE hỏng — kiểm bằng `go depth 1` lúc khởi động) → `BotUnavailableError`. Lỗi giữa ván → khởi động lại 1 lần, nước đó gắn `fallback`; vẫn hỏng → `RuntimeError` (ván hủy), không bao giờ đi ngẫu nhiên.
+- `threads = 1` (công bằng với bot Python, tất định), `hash_mb = 16`; tùy chọn `engine_path`/`BENCH9_ENGINE_PATH`, `nnue_path`, `syzygy_path`.
+- `tournament.process_player` cộng `bot.external_memory_bytes()` (đỉnh RAM tiến trình Stockfish, ~230–330 MB) vào cột Bộ nhớ rồi gọi `bot.close()`.
+- Kết quả (1 s/nước, khai cuộc 2 nửa nước ghép cặp đổi màu, tối đa 150 nửa nước): xem `documents/bench9/BENCHMARK_RESULTS.md` — B9 thắng 400/400 ván trước B7 và B8 (cận dưới Elo 95 % ≈ +729), mọi ván kết thúc bằng chiếu hết, không ván nào chạm mốc 150. Không huấn luyện NNUE riêng (`documents/bench9/KAGGLE_NNUE.md`).
 
 #### 4.9.4 Giải vòng tròn (`backend/tournament/`)
 
@@ -743,9 +754,9 @@ def get_bot_config(config, bot_id) -> dict: ...      # config["bots"][bot_id] ho
 | `[history]` | `max_games = 20` |
 | `[ui]` | `language = "vi"`, `sound_enabled = false`, `piece_set = "rhosgfx"`, `theme = "dark_winter"`, `bot_move_delay_ms = 300`, `replay_delay_ms = 800`, `show_debug_bots = false` |
 | `[eval_bar]` | `scale = 8.0` |
-| `[benchmarks]` | `max_level` (§4.9; hiện đặt 4 = chỉ B1–B4, 7 = đến B7, 8 = có B8) |
-| `[tournament]` | `bots` (4 thành viên + B1 … B8, lọc theo `max_level`), `matches_per_pair = 1`, `max_history = 15`, `max_plies = 150`, `max_think_time_s = 1.0`, `measure_memory = true`, `eta_smoothing = 0.3`, `depth = 0`, `random_opening_plies = 2`, `claim_draw = true`, `seed = -1` |
-| `[bots.<id>]` | truyền vào `BaseBot(config=...)`; `display_name` ghi đè tên ở mọi màn/ngôn ngữ (thay `players.<id>` và `BaseBot.display_name`). Ví dụ: `deep_rl` (`weights_url`, `weights_sha256`, `device = "cpu"`), `bench_random` (`seed = -1`), `bench_alphabeta*` (`depth = 3`, `evaluator` = `pst`/`advanced`), benchmark B5+ (`max_think_time_s = 1.0`), `bench8_luna` (`max_plies = 150`) |
+| `[benchmarks]` | `max_level` (§4.9; hiện đặt 4 = chỉ B1–B4, 7 = đến B7, 8 = có B8, 9 = có B9) |
+| `[tournament]` | `bots` (4 thành viên + B1 … B9, lọc theo `max_level`), `matches_per_pair = 1`, `max_history = 15`, `max_plies = 150`, `max_think_time_s = 1.0`, `measure_memory = true`, `eta_smoothing = 0.3`, `depth = 0`, `random_opening_plies = 2`, `claim_draw = true`, `seed = -1` |
+| `[bots.<id>]` | truyền vào `BaseBot(config=...)`; `display_name` ghi đè tên ở mọi màn/ngôn ngữ (thay `players.<id>` và `BaseBot.display_name`). Ví dụ: `deep_rl` (`weights_url`, `weights_sha256`, `device = "cpu"`), `bench_random` (`seed = -1`), `bench_alphabeta*` (`depth = 3`, `evaluator` = `pst`/`advanced`), benchmark B5+ (`max_think_time_s = 1.0`), `bench8_luna` (`max_plies = 150`), `bench_super_alphabeta_nnue` (`threads`, `hash_mb`, `time_safety_s`, `engine_path`, `nnue_path`, `syzygy_path`) |
 
 ## 7. Option 4 — Deep RL (`backend/ai/deep_rl/`)
 
@@ -802,4 +813,4 @@ def get_bot_config(config, bot_id) -> dict: ...      # config["bots"][bot_id] ho
 | OI-4 | Username GitHub thành viên Option 3 | Chờ; cập nhật §2 và CODEOWNERS |
 | OI-5 | `max_plies`, số nước khai cuộc ngẫu nhiên tối ưu | Tạm 300 (ván thường) / 150 (giải) và 2 |
 | OI-6 | Thanh đánh giá dùng đánh giá riêng của bot | Hoãn; hiện dùng chênh lệch quân |
-| OI-7 | Bảng Xếp hạng AI tối đa 20 dòng | Chấp nhận (đủ 20 bot khi `max_level = 8`); thêm bot thì cần cuộn bảng |
+| OI-7 | Bảng Xếp hạng AI tối đa 25 dòng | Chấp nhận (2026-10-11: các màn chọn bot, Elo, Xếp hạng AI, lịch sử giải co lại cho tối đa 25 bot); hơn 25 bot thì cần cuộn bảng |

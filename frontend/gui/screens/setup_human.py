@@ -28,6 +28,7 @@ class SetupHumanScreen(Screen):
             include_debug=app.config.get("ui", {}).get("show_debug_bots", False),
             include_benchmarks=True,
             max_benchmark_level=registry.benchmark_level(app.config),
+            config=app.config,
         )
         self.available: dict[str, tuple[bool, str]] = {}
         for bot_id in self.bot_ids:
@@ -48,8 +49,10 @@ class SetupHumanScreen(Screen):
         self.bot_buttons: list[Button] = []
         self.reason_positions: list[tuple[int, int, str]] = []
         # Two-column grid; more rows (14-15 bots: compact, 19-20 bots: dense) move the title
-        # up and tighten the rows so the colour and action rows keep their place.
-        rows = (len(self.bot_ids) + 1) // 2
+        # up and tighten the rows so the colour and action rows keep their place. More than
+        # 20 bots (up to 27) use three columns of at most nine dense rows.
+        columns = 3 if len(self.bot_ids) > 20 else 2
+        rows = (len(self.bot_ids) + columns - 1) // columns
         if rows > 7:
             self._title_y, self._label_y = 44, 70
             row_start, row_step, button_height = 98, 36, 22
@@ -62,9 +65,9 @@ class SetupHumanScreen(Screen):
         self._bot_font = 13 if rows > 7 else 15
         for index, bot_id in enumerate(self.bot_ids):
             enabled, reason = self.available[bot_id]
-            column = index % 2
-            row_y = row_start + (index // 2) * row_step
-            x = 180 + column * 310
+            column = index % columns
+            row_y = row_start + (index // columns) * row_step
+            x = 35 + column * 305 if columns == 3 else 180 + column * 310
             self.bot_buttons.append(
                 Button(
                     pygame.Rect(x, row_y, 290, button_height),

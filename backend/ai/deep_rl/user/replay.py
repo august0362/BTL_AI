@@ -27,8 +27,39 @@ class ReplayBuffer:
         self.actions = np.zeros(capacity, dtype=np.int64)
         self.rewards = np.zeros(capacity, dtype=np.float32)
         self.dones = np.zeros(capacity, dtype=np.float32)
+        self.steps = np.ones(capacity, dtype=np.int64)
         self._next = 0
         self._size = 0
+
+    @classmethod
+    def from_arrays(cls, data: dict[str, np.ndarray]) -> ReplayBuffer:
+        """Tạo buffer từ các mảng đã nén mà không giải nén trạng thái."""
+        count = len(data["actions"])
+        if count == 0:
+            raise ValueError("cannot create a replay buffer from empty arrays")
+        buffer = cls(count)
+        for name in (
+            "states",
+            "next_states",
+            "next_masks",
+            "actions",
+            "rewards",
+            "dones",
+        ):
+            value = np.asarray(data[name])
+            if len(value) != count:
+                raise ValueError(f"array {name} has a different sample count")
+            setattr(buffer, name, value)
+        if "steps" in data:
+            buffer.steps = np.asarray(data["steps"])
+            if len(buffer.steps) != count:
+                raise ValueError("array steps has a different sample count")
+        if "masks" in data:
+            buffer.masks = np.asarray(data["masks"])
+            if len(buffer.masks) != count:
+                raise ValueError("array masks has a different sample count")
+        buffer._size = count
+        return buffer
 
     def __len__(self) -> int:
         return self._size
@@ -41,6 +72,7 @@ class ReplayBuffer:
         next_state: np.ndarray,
         done: bool,
         next_mask: np.ndarray,
+        steps: int = 1,
     ) -> None:
         """Thêm một chuyển tiếp; ``state``/``next_state`` là ``uint8 (18, 8, 8)``."""
         index = self._next
@@ -50,6 +82,7 @@ class ReplayBuffer:
         self.actions[index] = action
         self.rewards[index] = reward
         self.dones[index] = float(done)
+        self.steps[index] = steps
         self._next = (index + 1) % self.capacity
         self._size = min(self._size + 1, self.capacity)
 
@@ -59,11 +92,15 @@ class ReplayBuffer:
             raise ValueError("cannot sample from an empty buffer")
         index = rng.integers(0, self._size, size=batch_size)
         shape = (batch_size, PLANES, 8, 8)
-        return {
+        batch = {
             "states": np.unpackbits(self.states[index], axis=1).reshape(shape),
             "actions": self.actions[index],
             "rewards": self.rewards[index],
             "next_states": np.unpackbits(self.next_states[index], axis=1).reshape(shape),
             "next_masks": np.unpackbits(self.next_masks[index], axis=1).astype(np.bool_),
             "dones": self.dones[index],
+            "steps": self.steps[index],
         }
+        if hasattr(self, "masks"):
+            batch["masks"] = np.unpackbits(self.masks[index], axis=1).astype(np.bool_)
+        return batch

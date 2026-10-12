@@ -28,8 +28,13 @@ def evaluate(
     n_games: int,
     seed: int | None = None,
     max_plies: int = 300,
+    opening_plies: int = 0,
 ) -> EvalResult:
-    """Play games with policy color alternating each game."""
+    """Play games with policy color alternating each game.
+
+    ``opening_plies`` random moves start each game (like the AI ranking), so two deterministic
+    players still play different games.
+    """
     if n_games <= 0 or max_plies <= 0:
         raise ValueError("n_games and max_plies must be positive")
     rng = random.Random(seed)
@@ -37,6 +42,8 @@ def evaluate(
     for game_index in range(n_games):
         policy_color = chess.WHITE if game_index % 2 == 0 else chess.BLACK
         board = chess.Board()
+        for _ in range(opening_plies):
+            board.push(rng.choice(list(board.legal_moves)))
         plies = 0
         while board.outcome(claim_draw=True) is None and plies < max_plies:
             if board.turn == policy_color:

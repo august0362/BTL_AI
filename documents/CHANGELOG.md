@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### Added — Benchmark 9 "Super Alpha-Beta NNUE" (2026-10-11, CONTEXT §4.9.5)
+- `bench_super_alphabeta_nnue` (thế hệ 9, package `ai.benchmarks_extension.bench9`): Stockfish 19 chính thức (GPLv3, NNUE `nn-1a298aa575a0.nnue`) qua UCI — benchmark **kế thừa engine**, không tự viết. Trình cài đặt ghim bản phát hành + SHA-256 (`python -m ai.benchmarks_extension.bench9.install`), CI cache và cài engine. Tài liệu `documents/bench9/`. Test: `another/tests/ai/test_benchmark9.py` (+ `fake_uci_engine.py`).
+- Công cụ đo sức mạnh `another/tools/bench9_strength.py` (khai cuộc ghép cặp đổi màu, tiến trình riêng như giải, Elo + khoảng tin cậy). B9 thắng 400/400 ván trước B7/B8.
+- `tournament/process_player.py`: cộng RAM tiến trình con của bot (`external_memory_bytes()`) vào cột Bộ nhớ, rồi `close()` bot.
+
+### Changed — Danh sách bot (2026-10-11)
+- **Bỏ hẳn** `bench5_grok`, `bench6_grok`, `bench5_gemini` (lớp bot, profile, registry, config, locale, test).
+- Màn Người vs Bot (3 cột khi > 20 bot), Elo, Xếp hạng AI, lịch sử giải: chứa tối đa 25 bot.
+
 ### Added — Bot benchmark (CONTEXT §4.9)
 - **B1–B4** (`backend/ai/benchmarks/`), thang phân loại sức mạnh: `bench_random` (ngẫu nhiên đều), `bench_alphabeta3` (alpha-beta sâu 3, eval `ai.baseline`), `bench_alphabeta_tt` (+ TT Zobrist, sắp nước MVV-LVA/killer), `bench_alphabeta_custom` (eval chọn qua `evaluator`). B4: null-move + LMR từ độ sâu còn lại ≥ 2 (trước chỉ khi `depth >= 4`).
 - **B5** (5 bot: GPT, Gemini, DeepSeek, Grok — mỗi bản theo một đề xuất — và Tổng hợp): engine PVS dùng hết thời gian; kiểm tra đồng hồ mỗi 256 node (trước 1024), sau đó 128. Test: `another/tests/ai/test_benchmark5.py`.

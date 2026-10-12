@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 from typing import Protocol
@@ -43,6 +44,68 @@ class GreedyCaptureOpponent:
 
         best = max(value(move) for move in captures)
         return source.choice([move for move in captures if value(move) == best])
+
+
+_MATE_SCORE = 10_000
+
+
+class MaterialAlphaBetaOpponent:
+    """Like Benchmark 1.5: negamax alpha-beta at fixed depth, score = own minus enemy material.
+
+    Written here because ``deep_rl`` may not import the benchmark package. Captures are searched
+    first (same result, faster); ties at the root are broken with ``rng`` so games vary.
+    """
+
+    def __init__(self, depth: int = 3) -> None:
+        if depth < 1:
+            raise ValueError("depth must be >= 1")
+        self.depth = depth
+
+    def select_move(self, board: chess.Board, rng: random.Random | None = None) -> chess.Move:
+        """Return a best move of the fixed-depth search."""
+        source = rng or random
+        alpha, best_moves = -math.inf, []
+        for move in self._ordered(board):
+            board.push(move)
+            score = -self._negamax(board, self.depth - 1, -math.inf, -alpha + 1e-9, 1)
+            board.pop()
+            if score > alpha:
+                alpha, best_moves = score, [move]
+            elif score == alpha:
+                best_moves.append(move)
+        return source.choice(best_moves)
+
+    def _negamax(
+        self, board: chess.Board, depth: int, alpha: float, beta: float, ply: int
+    ) -> float:
+        if board.is_checkmate():
+            return -(_MATE_SCORE - ply)
+        if board.is_stalemate() or board.is_insufficient_material():
+            return 0.0
+        if depth == 0:
+            return float(_material(board, board.turn) - _material(board, not board.turn))
+        best = -math.inf
+        for move in self._ordered(board):
+            board.push(move)
+            score = -self._negamax(board, depth - 1, -beta, -alpha, ply + 1)
+            board.pop()
+            best = max(best, score)
+            alpha = max(alpha, score)
+            if alpha >= beta:
+                break
+        return best
+
+    @staticmethod
+    def _ordered(board: chess.Board) -> list[chess.Move]:
+        moves = list(board.legal_moves)
+        moves.sort(key=lambda move: not board.is_capture(move))
+        return moves
+
+
+def _material(board: chess.Board, color: chess.Color) -> int:
+    return sum(
+        value * len(board.pieces(piece_type, color)) for piece_type, value in _VALUES.items()
+    )
 
 
 @dataclass

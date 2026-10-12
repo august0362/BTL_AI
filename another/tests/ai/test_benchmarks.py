@@ -4,10 +4,13 @@ import chess
 import pytest
 
 from ai import registry
+from ai.base_bot import BotUnavailableError
 from ai.benchmarks import evaluation, search
 from ai.benchmarks.bot import MAX_DEPTH, BenchmarkAlphaBetaCustomBot, resolve_depth
 
-BENCHMARK_IDS = list(registry.BENCHMARK_BOTS)
+# Benchmark 7, 8, 9 chỉ chạy trên máy (không có test riêng); test chung chỉ phủ Benchmark 1–6.
+LOCAL_ONLY = {"bench7", "bench8_luna", "bench_super_alphabeta_nnue"}
+BENCHMARK_IDS = [bot_id for bot_id in registry.BENCHMARK_BOTS if bot_id not in LOCAL_ONLY]
 FAST = {"fast_mode": True, "depth": 1, "seed": 0}
 
 POSITIONS = {
@@ -21,10 +24,19 @@ CENTRAL_KNIGHT_FEN = "rnbqkbnr/pppppppp/8/8/3N4/8/PPPPPPPP/RNBQKB1R w KQkq - 0 1
 CAPTURE_FEN = "4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1"
 
 
+def _create(bot_id: str, config: dict):
+    """Tạo bot; bỏ qua (skip) benchmark cần thứ không có trên máy, vd engine Stockfish của B9
+    (``python -m ai.benchmarks_extension.bench9.install``, không nằm trong git)."""
+    try:
+        return registry.create_bot(bot_id, config)
+    except BotUnavailableError as exc:
+        pytest.skip(str(exc))
+
+
 @pytest.mark.parametrize("bot_id", BENCHMARK_IDS)
 @pytest.mark.parametrize("name", list(POSITIONS))
 def test_benchmarks_return_legal_moves_without_mutating(bot_id, name):
-    bot = registry.create_bot(bot_id, dict(FAST))
+    bot = _create(bot_id, dict(FAST))
     board = chess.Board(POSITIONS[name])
     before = (board.fen(), len(board.move_stack))
     move = bot.select_move(board)
@@ -35,14 +47,14 @@ def test_benchmarks_return_legal_moves_without_mutating(bot_id, name):
 
 @pytest.mark.parametrize("bot_id", BENCHMARK_IDS)
 def test_benchmarks_find_the_only_legal_move(bot_id):
-    bot = registry.create_bot(bot_id, dict(FAST))
+    bot = _create(bot_id, dict(FAST))
     assert bot.select_move(chess.Board(ONLY_MOVE_FEN)) == chess.Move.from_uci("e1e2")
 
 
 @pytest.mark.parametrize("bot_id", BENCHMARK_IDS)
 def test_benchmarks_are_deterministic(bot_id):
-    first = registry.create_bot(bot_id, {"depth": 2, "seed": 7})
-    second = registry.create_bot(bot_id, {"depth": 2, "seed": 7})
+    first = _create(bot_id, {"depth": 2, "seed": 7})
+    second = _create(bot_id, {"depth": 2, "seed": 7})
     moves_first = [first.select_move(chess.Board()).uci() for _ in range(3)]
     moves_second = [second.select_move(chess.Board()).uci() for _ in range(3)]
     assert moves_first == moves_second

@@ -78,28 +78,12 @@ class Benchmark5GptBot(_Benchmark5Bot):
     profile = PROFILES["gpt"]
 
 
-class Benchmark5GeminiBot(_Benchmark5Bot):
-    """Benchmark 5 built only from the Gemini design (``gemini.txt``)."""
-
-    bot_id = "bench5_gemini"
-    display_name = "Benchmark 5 - Gemini"
-    profile = PROFILES["gemini"]
-
-
 class Benchmark5DeepSeekBot(_Benchmark5Bot):
     """Benchmark 5 built only from the DeepSeek design (``deepseek.txt``)."""
 
     bot_id = "bench5_deepseek"
     display_name = "Benchmark 5 - DeepSeek"
     profile = PROFILES["deepseek"]
-
-
-class Benchmark5GrokBot(_Benchmark5Bot):
-    """Benchmark 5 built only from the Grok design (``grok.txt``)."""
-
-    bot_id = "bench5_grok"
-    display_name = "Benchmark 5 - Grok"
-    profile = PROFILES["grok"]
 
 
 class Benchmark5HybridBot(_Benchmark5Bot):

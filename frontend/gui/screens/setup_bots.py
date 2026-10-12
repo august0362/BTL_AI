@@ -26,6 +26,7 @@ class SetupBotsScreen(Screen):
             include_debug=app.config.get("ui", {}).get("show_debug_bots", False),
             include_benchmarks=True,
             max_benchmark_level=registry.benchmark_level(app.config),
+            config=app.config,
         )
         self.available: dict[str, tuple[bool, str]] = {}
         for bot_id in self.bot_ids:

@@ -65,49 +65,6 @@ GPT = Profile5(
 )
 
 
-# -------------------------------------------------------------------------- Gemini
-def _gemini_null(depth: int) -> int:
-    """R=2 at depth 3..4, R=3 from depth 5."""
-    return 2 if depth < 5 else 3
-
-
-def _gemini_draws(root_eval: int) -> tuple[int, int]:
-    """Dynamic contempt: ahead >= +100 -> draw -80, behind <= -150 -> draw +50."""
-    if root_eval >= 100:
-        return -80, -80
-    if root_eval <= -150:
-        return 50, 50
-    return 0, 0
-
-
-GEMINI = Profile5(
-    name="gemini",
-    search=SearchConfig(
-        soft_fraction=0.60,
-        hard_fraction=0.92,
-        check_mask=127,  # every 128 nodes so the per-move cap holds at ~10k nps
-        reverse_futility=(2, 120),  # "static_eval - 120 * depth >= beta"
-        null_move=NullMoveConfig(min_depth=3, reduction=_gemini_null, non_pv_only=False),
-        lmr=LmrConfig(min_depth=3, full_moves=3, skip_killers=True),
-        check_extensions=1,  # "tối đa 1 lần trên một nhánh"
-        quiescence=QuiescenceConfig(max_ply=16, delta_node=950),  # no ply cap given
-        twofold=True,  # "đã xuất hiện >= 1 lần ... coi như hòa"
-        draw_scores=_gemini_draws,
-    ),
-    evaluation=EvalConfig(
-        mg_values=FLAT_VALUES,
-        eg_values=(0, 120, 300, 330, 530, 950, 0),
-        mopup=MopUp(
-            min_advantage=300,
-            max_phase=4,
-            enemy_without_pawns=True,
-            enemy_center=4,  # 4 x CenterDistance
-            king_manhattan=3,  # 3 x (14 - Manhattan)
-        ),
-    ),
-)
-
-
 # ------------------------------------------------------------------------ DeepSeek
 def _deepseek_null(depth: int) -> int:
     return 2 + depth // 6
@@ -167,63 +124,6 @@ DEEPSEEK = Profile5(
             own_center=15,
             edge_bonus=50,
         ),
-    ),
-)
-
-
-# ---------------------------------------------------------------------------- Grok
-def _grok_null(depth: int) -> int:
-    return 3 if depth >= 6 else 2  # "R=2–3 (tăng theo depth)"
-
-
-def _grok_lmr(depth: int, index: int) -> int:
-    return max(1, depth // 6 + index // 12)  # "depth/6 + move/12"
-
-
-def _grok_draws(root_eval: int) -> tuple[int, int]:
-    """Contempt 15 while ahead ("tránh hòa khi hơn")."""
-    return (-15, -15) if root_eval > 0 else (0, 0)
-
-
-GROK = Profile5(
-    name="grok",
-    search=SearchConfig(
-        soft_fraction=0.75,  # "0.7–0.8"
-        hard_fraction=0.95,
-        check_mask=127,  # every 128 nodes so the per-move cap holds at ~10k nps
-        stop_on_mate=True,  # "dừng sớm nếu mate tìm thấy"
-        aspiration=(50,),  # "±50; fail thì research full window"
-        aspiration_min_depth=4,
-        tt_entries=1_000_000,  # "1–2M entries"
-        capture_split="see",  # "MVV-LVA + SEE nếu có"
-        null_move=NullMoveConfig(
-            min_depth=3, reduction=_grok_null, non_pv_only=True, verify_depth=6
-        ),
-        futility=(2, 200),  # "futility/delta pruning nhẹ ở depth <= 2"
-        lmr=LmrConfig(min_depth=3, full_moves=2, reduction=_grok_lmr, skip_killers=True),
-        check_extensions=3,  # "Check +1 (max 3 trên nhánh)"
-        capture_extension=True,  # "capture/promotion gần lá +1 nếu SEE >= 0"
-        quiescence=QuiescenceConfig(
-            max_ply=12, delta_move=200, see_prune=True, first_ply_checks=True
-        ),
-        twofold=False,  # "trong cây chỉ coi repetition 3 lần = 0"
-        draw_scores=_grok_draws,
-        root_repetition_penalty=15,  # "ở gốc phạt nhẹ repetition 2 lần"
-    ),
-    evaluation=EvalConfig(
-        # Benchmark 4 terms kept, structure penalties raised as proposed.
-        doubled=20,
-        isolated=25,
-        islands=10,
-        passed=(0, 8, 15, 30, 50, 90, 150, 0),
-        bishop_pair=30,
-        rook_open=20,
-        rook_semi_open=10,
-        king_shield=15,
-        king_open_file=20,
-        king_semi_open_file=20,
-        mobility=True,
-        mopup=MopUp(min_advantage=200, max_phase=8, enemy_center=15, king_manhattan=4),
     ),
 )
 
@@ -294,6 +194,4 @@ HYBRID = Profile5(
     ),
 )
 
-PROFILES: dict[str, Profile5] = {
-    profile.name: profile for profile in (GPT, GEMINI, DEEPSEEK, GROK, HYBRID)
-}
+PROFILES: dict[str, Profile5] = {profile.name: profile for profile in (GPT, DEEPSEEK, HYBRID)}

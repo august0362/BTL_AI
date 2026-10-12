@@ -55,6 +55,7 @@ modules = [
     "ai.benchmarks_extension.bench6",
     "ai.benchmarks_extension.bench7",
     "ai.benchmarks_extension.bench8",
+    "ai.benchmarks_extension.bench9",
 ]
 
 [[tool.importlinter.contracts]]
@@ -72,4 +73,5 @@ forbidden_modules = [
     "ai.benchmarks_extension.bench6",
     "ai.benchmarks_extension.bench7",
     "ai.benchmarks_extension.bench8",
+    "ai.benchmarks_extension.bench9",
 ]

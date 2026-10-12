@@ -21,7 +21,7 @@ backend/ai/*/weights/
 kaggle.json
 wandb/
 runs/
-# notebook, zip code và kết quả train Deep RL trên Kaggle (chỉ giữ trên máy)
+# notebook, PGN pretrain, zip code và kết quả train Deep RL (chỉ giữ trên máy)
 backend/ai/deep_rl/kaggle/*
 
 # ---------- Python ----------
@@ -65,3 +65,20 @@ DEEP_RL_DESIGN.md
 RL_LEARNING_GUIDE.md
 # ---------- Bản Android cá nhân (build bằng Buildozer, KHÔNG commit) ----------
 android/
+
+
+# Documents
+documents/codex
+documents/images
+
+# Test log train Deep RL: chỉ để trên máy
+another/tests/ai/deep_rl/test_drill_log.py
+backend/ai/deep_rl/OVERVIEW.md
+
+# Benchmark 9: Stockfish binary installed by python -m ai.benchmarks_extension.bench9.install
+backend/ai/benchmarks_extension/bench9/engine/
+
+# Công cụ đo sức mạnh Benchmark 9: chỉ để kiểm tra trên máy
+another/tools/bench9_strength.py
+
+AGENTS.md

@@ -59,8 +59,10 @@ class TournamentScreen(Screen):
         super().__init__(app)
         # More than 14 bots (19 by default) use 16 px rows and move the controls down.
         self._dense = len(app.tournament.settings.bots) > 14
-        button_y = 524 if self._dense else 470
-        self._status_y = 486 if self._dense else 434
+        # More than 20 bots (up to 25): 14 px rows, controls pushed further down.
+        self._crowded = len(app.tournament.settings.bots) > 20
+        button_y = 556 if self._crowded else 524 if self._dense else 470
+        self._status_y = 526 if self._crowded else 486 if self._dense else 434
         self.start = Button(
             pygame.Rect(70, button_y, 210, 44), app.translator.t("tournament.start")
         )
@@ -69,7 +71,8 @@ class TournamentScreen(Screen):
             pygame.Rect(300, button_y, 180, 44), app.translator.t("tournament.history")
         )
         self.back = Button(pygame.Rect(800, button_y, 90, 44), app.translator.t("setup.back"))
-        self.progress_bar = ProgressBar(pygame.Rect(70, 466 if self._dense else 410, 820, 12))
+        progress_y = 508 if self._crowded else 466 if self._dense else 410
+        self.progress_bar = ProgressBar(pygame.Rect(70, progress_y, 820, 12))
         self.sort_field = DEFAULT_SORT
         self._sorted_at = 0
 
@@ -142,11 +145,14 @@ class TournamentScreen(Screen):
             canvas.blit(header_font.render(label, True, color), (x, 128))
         row_font = get_font(11 if self._dense else 12)
         playing = set(snapshot.current_pair or ()) if snapshot.running else set()
-        rows = sort_rows(tournament_rows(standings, translator), self.sort_field)[:20]
-        # Nine bots keep the roomy 26 px rows; up to 14 bots use 18 px rows, more use 16 px.
-        row_step = 26 if len(rows) <= 9 else 18 if len(rows) <= 14 else 16
+        rows = sort_rows(tournament_rows(standings, translator), self.sort_field)
+        # Nine bots keep the roomy 26 px rows; up to 14 bots use 18 px rows, up to 20 use 16 px,
+        # more (up to 25) use 14 px.
+        row_step = (
+            26 if len(rows) <= 9 else 18 if len(rows) <= 14 else 16 if len(rows) <= 20 else 14
+        )
         for index, row in enumerate(rows):
-            y = (150 if row_step == 16 else 154) + index * row_step
+            y = (150 if row_step <= 16 else 154) + index * row_step
             if row.player_id in playing:
                 # Highlight the two bots of the game in progress with theme colours.
                 band = pygame.Rect(60, y - 2, 840, row_step)

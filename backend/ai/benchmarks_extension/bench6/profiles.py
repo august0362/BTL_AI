@@ -188,93 +188,6 @@ GEMINI6 = Profile6(
 )
 
 
-# ---------------------------------------------------------------------------- Grok
-def _grok_draws(root_eval: int) -> tuple[int, int]:
-    """Contempt +10..30 by material advantage ("Contempt động (+10-30 tùy material)")."""
-    if root_eval >= 300:
-        value = -30
-    elif root_eval >= 100:
-        value = -20
-    elif root_eval > 0:
-        value = -10
-    else:
-        value = 0
-    return value, value
-
-
-GROK6 = Profile6(
-    name="grok",
-    search=SearchConfig6(
-        time=TimeConfig6(soft=0.7, hard=0.95, policy="complexity", late=0.95),
-        aspiration=(40, 120, 400),  # "±30-50 cp, mở rộng x2-4 khi fail"
-        tt_bits=21,  # "1-4M entries"
-        tt_ways=1,
-        countermove=True,
-        history_malus=True,
-        continuation=(1, 2),  # "continuation (1-2 ply trước)"
-        capture_order="see",
-        null_move=NullMove6(min_depth=3, base=2, depth_div=6, static_ge_beta=True, verify_depth=8),
-        reverse_futility=(4, 125, 0),  # "depth <= 3-4, margin 100-150 x depth"
-        razoring=(3, 300, 125),
-        futility=(2, 200, 0),
-        singular=(6, 3, 0, 12),  # "R ~ depth/2, margin 75-150"
-        iir_min_depth=5,  # "IIR: không có TT-move ở depth >= 4-5 -> giảm 1"
-        # "R = 1 + log(depth)*log(moveCount)/2, ±1 theo history; không reduce killer"
-        lmr=Lmr6(
-            min_depth=3,
-            full_moves=2,
-            base=1.0,
-            divisor=2.0,
-            pv_less=1,
-            not_improving_more=0,
-            killer_less=9,
-            cut_node_more=0,
-            history_divisor=8_000,
-        ),
-        check_extensions=4,  # "Check +1 (max 3-4)"
-        capture_extension=True,
-        recapture_extension=True,
-        mate_distance_pruning=True,
-        quiescence=Quiescence6(
-            max_ply=14, promotions=True, delta=175, see_prune=True, first_ply_checks=2
-        ),  # "Capture + check (giới hạn số check)"
-        twofold=False,  # "Trong cây chỉ 3-fold = 0; ở gốc phạt nhẹ 2-fold"
-        draw_scores=_grok_draws,
-        root_repetition_penalty=15,
-    ),
-    evaluation=EvalConfig6(
-        doubled=20,
-        isolated=25,
-        backward=15,
-        islands=10,
-        phalanx=5,
-        supported=5,
-        candidate=6,
-        passed=(0, 8, 15, 30, 50, 90, 150, 0),
-        passer_protected=10,
-        passer_blocked_pct=50,
-        unstoppable_passer=300,  # "KPK (rule of square + opposition)"
-        bishop_pair=30,
-        rook_open=20,
-        rook_semi_open=10,
-        rook_seventh=20,
-        knight_outpost=20,
-        bishop_outpost=10,
-        mobility=(4, 4, 2, 1),
-        king_shield=15,
-        king_open_file=20,
-        king_semi_open_file=20,
-        king_storm=8,
-        threat_pawn=30,
-        threat_minor=20,
-        hanging=30,
-        mopup=MopUp6(min_advantage=175, max_phase=8, enemy_center=15, king_manhattan=4),
-        scaling=True,
-        lazy_margin=300,  # "early-out khi material extreme"
-    ),
-)
-
-
 # ------------------------------------------------------------------------ DeepSeek
 def _deepseek_draws(root_eval: int) -> tuple[int, int]:
     """Contempt 40 when ahead >= 100, otherwise 30 (twofold: 0 when behind)."""
@@ -389,6 +302,4 @@ DEEPSEEK6 = Profile6(
 )
 
 
-PROFILES6: dict[str, Profile6] = {
-    profile.name: profile for profile in (GPT6, GEMINI6, GROK6, DEEPSEEK6)
-}
+PROFILES6: dict[str, Profile6] = {profile.name: profile for profile in (GPT6, GEMINI6, DEEPSEEK6)}

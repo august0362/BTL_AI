@@ -123,12 +123,14 @@ class TournamentHistoryScreen(Screen):
             canvas.blit(
                 get_font(12, bold=True).render(translator.t(key), True, roles["accent"]), (x, 120)
             )
-        rows = tournament_rows(result.standings, translator)[:20]
+        rows = tournament_rows(result.standings, translator)[:25]
         compact = len(rows) > 9
         dense = len(rows) > 14
+        crowded = len(rows) > 20  # up to 25 bots: 12 px rows, matchups moved down
         font = get_font(10 if dense else 11 if compact else 12)
         for index, row in enumerate(rows):
-            y = 146 + index * (13 if dense else 14 if compact else 22)
+            step = 12 if crowded else 13 if dense else 14 if compact else 22
+            y = (144 if crowded else 146) + index * step
             values = (
                 str(row.rank),
                 row.name,
@@ -142,11 +144,13 @@ class TournamentHistoryScreen(Screen):
             get_font(14, bold=True).render(
                 translator.t("tournament_history.matchups"), True, roles["text"]
             ),
-            (340, self._matchups_y(result) - 50),
+            (340, self._matchups_y(result) - (38 if len(result.standings) > 20 else 50)),
         )
 
     def _matchups_y(self, result) -> int:
-        """Top of the matchup list; long standings (> 14 bots) push it down."""
+        """Top of the matchup list; long standings (> 14, > 20 bots) push it down."""
+        if len(result.standings) > 20:
+            return 486
         return 448 if len(result.standings) > 14 else 400
 
     def _draw_matchups(self, canvas: Render, result) -> None:
@@ -155,7 +159,7 @@ class TournamentHistoryScreen(Screen):
         font = get_font(12)
         visible = result.matchups[self.matchup_offset : self.matchup_offset + self.VISIBLE_MATCHUPS]
         top = self._matchups_y(result)
-        step = 20 if top > 400 else 24
+        step = 16 if top > 448 else 20 if top > 400 else 24
         self.scroll_up.y = self.scroll_down.y = top - 22
         for index, matchup in enumerate(visible):
             canvas.blit(
