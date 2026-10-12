@@ -41,7 +41,11 @@ class TournamentConfig:
             from ai import registry
 
             level = registry.benchmark_level(config)
-            bot_ids = tuple(bot for bot in bots if registry.benchmark_allowed(bot, level))
+            bot_ids = tuple(
+                bot
+                for bot in bots
+                if registry.benchmark_allowed(bot, level) and _bot_enabled(bot, config)
+            )
         else:
             bot_ids = _default_bots(config)
         if len(bot_ids) < 2 or len(set(bot_ids)) != len(bot_ids):
@@ -105,8 +109,18 @@ def _float_value(table: dict, key: str, default: float) -> float:
 def _default_bots(config: dict | None = None) -> tuple[str, ...]:
     from ai import registry
 
-    return tuple(
+    bot_ids = list(
         registry.list_bots(
-            include_benchmarks=True, max_benchmark_level=registry.benchmark_level(config)
+            include_benchmarks=True,
+            max_benchmark_level=registry.benchmark_level(config),
+            config=config,
         )
     )
+    return tuple(bot_id for bot_id in bot_ids if _bot_enabled(bot_id, config))
+
+
+def _bot_enabled(bot_id: str, config: dict | None) -> bool:
+    """Return false only when the bot's enabled setting is the boolean false."""
+    bots = (config or {}).get("bots", {})
+    settings = bots.get(bot_id, {}) if isinstance(bots, dict) else {}
+    return not isinstance(settings, dict) or settings.get("enabled") is not False

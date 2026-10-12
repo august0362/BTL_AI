@@ -5,6 +5,7 @@ Architecture, interface contracts and rules live in `documents/CONTEXT.md`. Read
 ## Hard rules
 - **Never modify or delete existing tests** — they are the spec. If you believe one is wrong, stop and explain why in your final message.
 - **Do add new tests** when your task asks for them (new test files, or new test functions appended to an existing file).
+- **No tests for Kaggle/notebook work**: never write tests for the notebooks in `backend/ai/deep_rl/kaggle/`, the Kaggle data files (PGN, puzzle CSV, `deep_rl.zip`) or training log/print formatting. These stay on the owner's machine and are checked by running them, even if a task prompt asks for such tests.
 - Edit **only** the files listed in your task. Other agents work in parallel on other files.
 - Respect module boundaries (`documents/CONTEXT.md` §3.1): bot packages never import each other; `backend/tournament/` and `frontend/gui/` load bots only via `ai.registry`.
 - Do not commit, push or create branches unless the task says so.

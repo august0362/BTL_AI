@@ -112,9 +112,31 @@ def _worker(conn, bot_id: str, config: dict) -> None:
                 conn.send(("error", str(exc)))
         else:  # "stop"
             _, peak = memory_usage()
-            conn.send(("memory", max(0, peak - baseline)))
+            conn.send(("memory", max(0, peak - baseline) + _external_memory(bot)))
             conn.close()
             return
+
+
+def _external_memory(bot: object) -> int:
+    """Peak memory of helper processes the bot runs (e.g. a UCI engine), then stop them.
+
+    A bot that starts its own processes reports them through ``external_memory_bytes()``;
+    the OS counters of this worker cannot see them.
+    """
+    used = 0
+    report = getattr(bot, "external_memory_bytes", None)
+    if callable(report):
+        try:
+            used = max(0, int(report()))
+        except Exception:  # noqa: BLE001 - a broken report must not lose the bot's own memory
+            used = 0
+    close = getattr(bot, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception:  # noqa: BLE001
+            pass
+    return used
 
 
 class ProcessPlayer:

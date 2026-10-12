@@ -29,15 +29,11 @@ BOT_IDS = (
     "bench_alphabeta_tt",
     "bench_alphabeta_custom",
     "bench5_gpt",
-    "bench5_gemini",
     "bench5_deepseek",
-    "bench5_grok",
     "bench5_hybrid",
     "bench6_gpt",
     "bench6_gemini",
-    "bench6_grok",
     "bench6_deepseek",
-    "bench7",
 )
 
 
@@ -46,8 +42,8 @@ def app(tmp_path):
     """Create an isolated application with debug bots disabled by default."""
     config = load_config(local_path=None)
     config["ui"]["show_debug_bots"] = False
-    # BOT_IDS lists generations up to 7; pin it so the test ignores the chosen display level.
-    config.setdefault("benchmarks", {})["max_level"] = 7
+    # BOT_IDS lists generations up to 6; pin it so the test ignores the chosen display level.
+    config.setdefault("benchmarks", {})["max_level"] = 6
     instance = App(config, tmp_path / "data", tmp_path / "local.toml")
     yield instance
     instance.quit()

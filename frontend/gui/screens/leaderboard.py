@@ -63,8 +63,11 @@ class LeaderboardScreen(Screen):
                 (x, 130),
             )
             x += width
-        rows = leaderboard_rows(self.app.ranking, self.app.translator)[:20]
-        row_step = 31 if len(rows) <= 11 else 26 if len(rows) <= 15 else 20
+        # Up to 25 bots plus the human player; more than 20 rows use 15 px rows.
+        rows = leaderboard_rows(self.app.ranking, self.app.translator)[:26]
+        row_step = (
+            31 if len(rows) <= 11 else 26 if len(rows) <= 15 else 20 if len(rows) <= 20 else 15
+        )
         for index, row in enumerate(rows):
             vals = (
                 str(row.rank),

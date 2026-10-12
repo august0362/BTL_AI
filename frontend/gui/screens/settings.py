@@ -9,6 +9,7 @@ import pygame
 from gui.render import Render
 from gui.screens.base import Screen
 from gui.theme import THEMES, Theme
+from gui.weights_info import WeightsRow, weights_rows
 from gui.widgets.button import Button
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ class SettingsScreen(Screen):
 
     def __init__(self, app: App) -> None:
         super().__init__(app)
+        self.theme_area = pygame.Rect(80, 184, 800, 306)
         self.vi = Button(
             pygame.Rect(360, 96, 112, 38),
             app.translator.t("settings.language_vi"),
@@ -36,6 +38,7 @@ class SettingsScreen(Screen):
             app.translator.t("settings.language_en"),
             selected=app.translator.language == "en",
         )
+        self.weights = Button(pygame.Rect(620, 96, 260, 38), self._weights_label())
         self.sound = Button(pygame.Rect(92, 518, 238, 38), self._sound_label())
         self.speed = Button(pygame.Rect(344, 518, 360, 38), self._speed_label())
         self.back = Button(pygame.Rect(720, 518, 160, 38), app.translator.t("setup.back"))
@@ -61,6 +64,21 @@ class SettingsScreen(Screen):
         delay = self.app.config.get("ui", {}).get("replay_delay_ms", 800)
         return f"{self.app.translator.t('settings.replay_speed')}: {delay} ms"
 
+    def _weights_label(self) -> str:
+        key = (
+            "settings.sound_on"
+            if self.app.config.get("ui", {}).get("show_weights_info", False)
+            else "settings.sound_off"
+        )
+        return f"{self.app.translator.t('settings.weights')}: {self.app.translator.t(key)}"
+
+    def _update_layout(self) -> None:
+        shown = self.app.config.get("ui", {}).get("show_weights_info", False)
+        self.theme_area = (
+            pygame.Rect(80, 270, 800, 220) if shown else pygame.Rect(80, 184, 800, 306)
+        )
+        self._layout_theme_rects()
+
     @staticmethod
     def _theme_groups() -> tuple[tuple[str, list[str]], ...]:
         dark = [theme_id for theme_id, theme in THEMES.items() if theme.is_dark]
@@ -78,7 +96,7 @@ class SettingsScreen(Screen):
                 row, column = divmod(index, 4)
                 self.theme_rects[theme_id] = pygame.Rect(
                     80 + column * self.COLUMN_STEP,
-                    self.THEME_AREA.y + y + row * self.ROW_STEP - self.scroll_offset,
+                    self.theme_area.y + y + row * self.ROW_STEP - self.scroll_offset,
                     self.CARD_WIDTH,
                     self.CARD_HEIGHT,
                 )
@@ -86,7 +104,7 @@ class SettingsScreen(Screen):
         self.content_height = max(0, y - 10)
 
     def _max_scroll(self) -> int:
-        return max(0, self.content_height - self.THEME_AREA.height)
+        return max(0, self.content_height - self.theme_area.height)
 
     def _scroll(self, amount: int) -> None:
         self.scroll_offset = max(0, min(self._max_scroll(), self.scroll_offset + amount))
@@ -101,7 +119,7 @@ class SettingsScreen(Screen):
         super().handle_hover(x, y)
         point = (x, y)
         self.preview_theme_id = None
-        if self.THEME_AREA.collidepoint(point):
+        if self.theme_area.collidepoint(point):
             for theme_id, rect in self.theme_rects.items():
                 if rect.collidepoint(point):
                     self.preview_theme_id = theme_id
@@ -114,6 +132,7 @@ class SettingsScreen(Screen):
                 or self.scroll_down.collidepoint(point)
                 or self.vi.contains(point)
                 or self.en.contains(point)
+                or self.weights.contains(point)
                 or self.sound.contains(point)
                 or self.speed.contains(point)
                 or self.back.contains(point)
@@ -132,6 +151,13 @@ class SettingsScreen(Screen):
             self.app.set_language("vi")
         elif self.en.contains(point):
             self.app.set_language("en")
+        elif self.weights.contains(point):
+            self.app._save_ui(
+                "show_weights_info",
+                not self.app.config.get("ui", {}).get("show_weights_info", False),
+            )
+            self.weights.label = self._weights_label()
+            self._update_layout()
         elif self.sound.contains(point):
             self.app.set_sound_enabled(not self.app.sound_enabled)
             self.sound.label = self._sound_label()
@@ -141,7 +167,7 @@ class SettingsScreen(Screen):
             self.speed.label = self._speed_label()
         elif self.back.contains(point):
             self.app.goto("menu")
-        elif self.THEME_AREA.collidepoint(point):
+        elif self.theme_area.collidepoint(point):
             for theme_id, rect in self.theme_rects.items():
                 if rect.collidepoint(point):
                     self.app.set_theme(theme_id)
@@ -175,11 +201,30 @@ class SettingsScreen(Screen):
             (80, 155),
             bold=True,
         )
-        canvas.draw_rect(roles["surface"], self.THEME_AREA, radius=10)
+        if self.app.config.get("ui", {}).get("show_weights_info", False):
+            rows = weights_rows(self.app.config, self.app.translator)
+            panel = pygame.Rect(80, 146, 800, 112)
+            canvas.draw_rect(roles["surface"], panel, radius=8)
+            canvas.text(
+                13,
+                self.app.translator.t("settings.weights_details"),
+                roles["text_muted"],
+                (94, 151),
+            )
+            for index, row in enumerate(rows[:4]):
+                file_name = row.file
+                font = canvas.font(13, canvas.scale)
+                details = self._weights_detail(row, file_name)
+                while font.size(details)[0] > round(772 * canvas.scale) and file_name:
+                    file_name = file_name[:-1] + "…" if len(file_name) > 1 else "…"
+                    details = self._weights_detail(row, file_name)
+                canvas.text(13, details, roles["text"], (94, 173 + index * 19))
+        self.weights.draw(canvas, 13, theme)
+        canvas.draw_rect(roles["surface"], self.theme_area, radius=10)
         previous_clip = canvas.surface.get_clip()
-        canvas.surface.set_clip(canvas.rect(self.THEME_AREA))
+        canvas.surface.set_clip(canvas.rect(self.theme_area))
         for group_key, y in self.group_positions:
-            group_y = self.THEME_AREA.y + y - self.scroll_offset
+            group_y = self.theme_area.y + y - self.scroll_offset
             canvas.text(
                 13,
                 self.app.translator.t(group_key),
@@ -188,7 +233,7 @@ class SettingsScreen(Screen):
                 bold=True,
             )
         for theme_id, rect in self.theme_rects.items():
-            if not rect.colliderect(self.THEME_AREA):
+            if not rect.colliderect(self.theme_area):
                 continue
             palette_theme = THEMES[theme_id]
             selected = theme_id == self.app.theme.id
@@ -233,6 +278,10 @@ class SettingsScreen(Screen):
         self.sound.draw(canvas, 13, theme)
         self.speed.draw(canvas, 13, theme)
         self.back.draw(canvas, 14, theme)
+
+    @staticmethod
+    def _weights_detail(row: WeightsRow, file_name: str) -> str:
+        return f"{row.name} — {file_name} ({row.source}) · sha {row.sha256} · depth {row.depth}"
 
     def _draw_scroll_control(self, canvas: Render, rect: pygame.Rect, *, up: bool, roles) -> None:
         enabled = self.scroll_offset > 0 if up else self.scroll_offset < self._max_scroll()

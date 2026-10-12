@@ -10,10 +10,8 @@ from ai import registry
 from ai.benchmarks_extension.bench6.evaluation import Evaluator6, pack, unpack
 from ai.benchmarks_extension.bench6.profiles import PROFILES6
 from ai.benchmarks_extension.bench6.search import BOOK_LINES, EXACT, Engine6, _build_book
-from ai.benchmarks_extension.bench7.evaluation import Evaluator6 as Evaluator7
-from ai.benchmarks_extension.bench7.profile import B7
 
-B6_IDS = ["bench6_gpt", "bench6_gemini", "bench6_grok", "bench6_deepseek", "bench7"]
+B6_IDS = ["bench6_gpt", "bench6_gemini", "bench6_deepseek"]
 MATE_IN_ONE = "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4"
 MATE_IN_TWO = "r5k1/5ppp/8/8/8/8/4RPPP/4R1K1 w - - 0 1"  # 1.Re8+ Rxe8 2.Rxe8#
 MIDDLEGAME = "r2q1rk1/1b1nbppp/p2ppn2/1p6/3NP3/1BN1BP2/PPPQ2PP/2KR3R w - - 0 12"
@@ -121,16 +119,10 @@ def test_respects_the_time_budget(bot_id):
     assert bot.last_search_info["depth"] >= 1
 
 
-@pytest.mark.parametrize("bot_id", ["bench6_gpt", "bench6_deepseek", "bench7"])
+@pytest.mark.parametrize("bot_id", ["bench6_gpt", "bench6_deepseek"])
 def test_winning_side_does_not_repeat(bot_id):
     board = chess.Board("4k3/8/8/8/8/8/4K3/R7 w - - 0 1")
     for uci in ("a1a2", "e8d8", "a2a1", "d8e8"):
         board.push_uci(uci)
     bot = registry.create_bot(bot_id, {"max_think_time_s": 0.5})
     assert bot.select_move(board) != chess.Move.from_uci("a1a2")
-
-
-def test_benchmark7_evaluation_is_colour_symmetric():
-    evaluate = Evaluator7(B7.evaluation)
-    for board in _random_boards(7, 120):
-        assert evaluate(board) == evaluate(board.mirror())

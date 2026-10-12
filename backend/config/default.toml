@@ -26,6 +26,7 @@ theme = "dark_winter"       # id theme (CONTEXT §5.12, §5.13); màu bàn cờ 
 bot_move_delay_ms = 300    # độ trễ tối thiểu giữa các nước Bot vs Bot
 replay_delay_ms = 800
 show_debug_bots = false
+show_weights_info = false
 
 [eval_bar]
 scale = 8.0                # giá trị thanh = tanh(chênh lệch quân / scale)
@@ -48,11 +49,14 @@ scale = 8.0                # giá trị thanh = tanh(chênh lệch quân / scale
 weights_url = "https://github.com/august0362/BTL_AI/releases/download/deeprl-v1.0/deeprl-v1.0.pt"   # link asset trên GitHub Release
 weights_sha256 = "a523ce212cb9cabb958b8f787dcb711a395772c268fcf4d2f811931d51ba1b39"
 device = "cpu"
+depth = 3                  # alpha-beta, điểm lá = max Q của mạng; 1 = chỉ dùng mạng (argmax Q)
+max_think_time_s = 1.0     # giây mỗi nước (iterative deepening); 0 = không giới hạn
 
 # ---------- Bot benchmark: bật/tắt theo thế hệ ----------
 [benchmarks]
 # Chỉ hiện các benchmark có số thế hệ <= max_level (ở Người vs Bot, Bot vs Bot, Elo, Xếp hạng AI).
-# 4 = Benchmark 1–4; 5 = thêm toàn bộ Benchmark 5; 6 = thêm Benchmark 6; 7 = thêm Benchmark 7; 8 = thêm Benchmark 8 …
+# 4 = Benchmark 1–4; 5 = thêm toàn bộ Benchmark 5; 6 = thêm Benchmark 6; 7 = thêm Benchmark 7; 8 = thêm Benchmark 8;
+# 9 = thêm Benchmark 9 (Stockfish 19, cần cài engine: python -m ai.benchmarks_extension.bench9.install) …
 # (Benchmark 1.5 có số 1.5.) Xóa khóa này = hiện mọi benchmark.
 max_level = 4
 
@@ -62,9 +66,9 @@ max_level = 4
 bots = [
     "alphabeta_regression", "genetic_alphabeta", "mcts", "deep_rl",
     "bench_random", "bench_alphabeta_material", "bench_alphabeta3", "bench_alphabeta_tt", "bench_alphabeta_custom",
-    "bench5_gpt", "bench5_gemini", "bench5_deepseek", "bench5_grok", "bench5_hybrid",
-    "bench6_gpt", "bench6_gemini", "bench6_grok", "bench6_deepseek", "bench7",
-    "bench8_luna",
+    "bench5_gpt", "bench5_deepseek", "bench5_hybrid",
+    "bench6_gpt", "bench6_gemini", "bench6_deepseek", "bench7",
+    "bench8_luna", "bench_super_alphabeta_nnue",
 ]
 matches_per_pair = 2      # số ván mỗi lượt thách đấu: lần lượt từng bot thách đấu mọi bot khác và cầm Trắng
                           # (A thách B, C… rồi B thách A, C…) → mỗi cặp 2 × số này ván, đủ Trắng/Đen
@@ -118,16 +122,8 @@ evaluator = "advanced"
 display_name = "Benchmark 5 · GPT"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 
-[bots.bench5_gemini]
-display_name = "Benchmark 5 · Gemini"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
-max_think_time_s = 1.0
-
 [bots.bench5_deepseek]
 display_name = "Benchmark 5 · DeepSeek"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
-max_think_time_s = 1.0
-
-[bots.bench5_grok]
-display_name = "Benchmark 5 · Grok"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 
 [bots.bench5_hybrid]
@@ -144,10 +140,6 @@ max_think_time_s = 1.0
 display_name = "Benchmark 6 · Gemini"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 
-[bots.bench6_grok]
-display_name = "Benchmark 6 · Grok"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
-max_think_time_s = 1.0
-
 [bots.bench6_deepseek]
 display_name = "Benchmark 6 · DeepSeek"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
@@ -161,3 +153,16 @@ max_think_time_s = 1.0
 display_name = "Benchmark 8 · Luna"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
 max_think_time_s = 1.0
 max_plies = 150   # số nửa nước tối đa của ván (như tournament.max_plies), dùng khi bật mốc hòa
+
+# Benchmark 9 "NNUE" (module ai.benchmarks_extension.bench9): engine Stockfish 19 chính thức
+# (GPLv3, NNUE nhúng sẵn) chạy qua UCI — KHÔNG phải engine tự viết, xem documents/bench9/. Hiện khi max_level >= 9.
+# Cài engine một lần: python -m ai.benchmarks_extension.bench9.install (tải bản đã ghim + kiểm SHA-256).
+[bots.bench_super_alphabeta_nnue]
+display_name = "Benchmark 9 · Prime"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
+max_think_time_s = 1.0   # giây mỗi nước; engine nhận movetime = trần − time_safety_s − độ trễ UCI đo được
+threads = 1              # 1 luồng như mọi bot khác trong giải (công bằng, tất định)
+hash_mb = 16             # bảng băm của Stockfish (MB); tính vào cột Bộ nhớ
+time_safety_s = 0.03     # khoảng an toàn thêm trước trần thời gian (giây)
+# engine_path = "..."    # đường dẫn engine khác máy: ghi trong local.toml (mặc định: bench9/engine/)
+# nnue_path = "..."      # mạng .nnue khác (mặc định: mạng chính thức nhúng trong binary)
+# syzygy_path = "..."    # thư mục tablebase Syzygy (tùy chọn; thiếu thì tắt)

@@ -48,11 +48,14 @@ class Model(nn.Module):
         self.body = nn.Sequential(*(ResidualBlock(channels) for _ in range(blocks)))
         self.head = nn.Conv2d(channels, MOVE_TYPES, 1)
 
+    def logits(self, observations: torch.Tensor) -> torch.Tensor:
+        """Đầu ra thô trước ``tanh`` (dùng cho pretrain bằng Cross-Entropy)."""
+        x = self.body(self.stem(observations.float()))
+        return self.head(x).permute(0, 2, 3, 1).reshape(x.shape[0], ACTIONS)
+
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         """Tính Q-value cho mọi hành động (chưa mask)."""
-        x = self.body(self.stem(observations.float()))
-        q = self.head(x).permute(0, 2, 3, 1).reshape(x.shape[0], ACTIONS)
-        return torch.tanh(q)
+        return torch.tanh(self.logits(observations))
 
     def config(self) -> dict[str, int]:
         """Kích thước mạng, lưu cùng trọng số để dựng lại khi nạp."""

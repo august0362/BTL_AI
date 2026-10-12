@@ -34,7 +34,12 @@ def tracked_files() -> list[str]:
 
 
 def test_no_large_files():
-    big = [p for p in tracked_files() if (PROJECT_ROOT / p).stat().st_size > MAX_FILE_BYTES]
+    # Bỏ qua file đã xóa trên ổ nhưng git vẫn còn ghi (chưa commit việc xóa)
+    big = [
+        p
+        for p in tracked_files()
+        if (PROJECT_ROOT / p).is_file() and (PROJECT_ROOT / p).stat().st_size > MAX_FILE_BYTES
+    ]
     assert not big, f"File > 5MB (dùng GitHub Release): {big}"
 
 

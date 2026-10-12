@@ -91,14 +91,6 @@ class Benchmark6GeminiBot(_Benchmark6Bot):
     profile = PROFILES6["gemini"]
 
 
-class Benchmark6GrokBot(_Benchmark6Bot):
-    """Benchmark 6 from the Grok design (``grok.txt``): singular extensions + rich HCE."""
-
-    bot_id = "bench6_grok"
-    display_name = "Benchmark 6 - Grok"
-    profile = PROFILES6["grok"]
-
-
 class Benchmark6DeepSeekBot(_Benchmark6Bot):
     """Benchmark 6 from the DeepSeek design (``deepseek.txt``): every modern technique."""
 

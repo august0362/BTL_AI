@@ -61,6 +61,7 @@ class App:
             known_ids=registry.list_bots(
                 include_benchmarks=True,
                 max_benchmark_level=registry.benchmark_level(self.config),
+                config=self.config,
             )
             + ["human"],
         )

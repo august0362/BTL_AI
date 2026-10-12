@@ -15,16 +15,14 @@ BENCHMARKS = [
     "bench_alphabeta_tt",
     "bench_alphabeta_custom",
     "bench5_gpt",
-    "bench5_gemini",
     "bench5_deepseek",
-    "bench5_grok",
     "bench5_hybrid",
     "bench6_gpt",
     "bench6_gemini",
-    "bench6_grok",
     "bench6_deepseek",
     "bench7",
     "bench8_luna",
+    "bench_super_alphabeta_nnue",
 ]
 
 
@@ -91,7 +89,9 @@ def test_benchmark_level_filters_generations():
     assert upto4 == OFFICIAL + BENCHMARKS[:5]
     upto5 = registry.list_bots(include_benchmarks=True, max_benchmark_level=5)
     assert upto5 == OFFICIAL + [
-        b for b in BENCHMARKS if not b.startswith(("bench6", "bench7", "bench8"))
+        b
+        for b in BENCHMARKS
+        if not b.startswith(("bench6", "bench7", "bench8", "bench_super_alphabeta_nnue"))
     ]
     assert registry.list_bots(include_benchmarks=True, max_benchmark_level=1) == OFFICIAL + [
         "bench_random"
