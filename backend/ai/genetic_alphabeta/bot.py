@@ -15,10 +15,10 @@ from ai.genetic_alphabeta.genome import (
     Genome,
     load_genome,
 )
-from ai.genetic_alphabeta.search import best_move
+from ai.genetic_alphabeta.search import TranspositionTable, search_iterative
 
 MAX_DEPTH = 4
-DEFAULT_DEPTH = 2
+DEFAULT_DEPTH = 3
 FAST_DEPTH = 1
 EVAL_SCALE = 8.0
 
@@ -37,13 +37,24 @@ def _resolve_settings(config: dict | None) -> dict:
 
 
 def _resolve_depth(settings: dict) -> int:
-    """Pick search depth: explicit `depth`, else 1 on fast_mode, else 2."""
+    """Pick search depth: explicit `depth`, else 1 on fast_mode, else 3."""
     default = FAST_DEPTH if settings.get("fast_mode") else DEFAULT_DEPTH
     try:
         depth = int(settings.get("depth", default))
     except (TypeError, ValueError):
         return default
     return min(max(depth, 1), MAX_DEPTH)
+
+
+def _resolve_time_limit(settings: dict) -> float | None:
+    """Per-move budget in seconds; None (or <= 0) means search to full depth."""
+    if "max_think_time_s" not in settings:
+        return None
+    try:
+        seconds = float(settings["max_think_time_s"])
+    except (TypeError, ValueError):
+        return None
+    return None if seconds <= 0 else seconds
 
 
 def _resolve_genome(settings: dict) -> Genome:
@@ -80,7 +91,16 @@ class GeneticAlphaBetaBot(BaseBot):
         settings = _resolve_settings(self.config)
         self._rng = random.Random(settings.get("seed"))
         self._depth = _resolve_depth(settings)
+        self._time_limit_s = _resolve_time_limit(settings)
         self._genome = _resolve_genome(settings)
+        self._tt = TranspositionTable()
+        self._killers: dict[int, chess.Move] = {}
+
+    def reset(self) -> None:
+        """Drop cached transpositions and killer moves between games."""
+        super().reset()
+        self._tt.clear()
+        self._killers.clear()
 
     def select_move(self, board: chess.Board) -> chess.Move:
         """Search the position and return a legal move (board left unchanged)."""
@@ -90,9 +110,17 @@ class GeneticAlphaBetaBot(BaseBot):
         if len(moves) == 1:
             self.last_search_info = {"depth": 0, "nodes": 1, "eval": 0.0}
             return moves[0]
-        move, nodes, score = best_move(board, self._genome, self._depth, self._rng)
+        move, nodes, score, reached = search_iterative(
+            board,
+            self._genome,
+            self._depth,
+            self._rng,
+            self._tt,
+            self._killers,
+            self._time_limit_s,
+        )
         self.last_search_info = {
-            "depth": self._depth,
+            "depth": reached,
             "nodes": nodes,
             "eval": _normalize(score),
         }

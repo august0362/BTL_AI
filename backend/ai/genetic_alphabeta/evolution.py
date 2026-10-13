@@ -2,6 +2,12 @@
 
 Only run on demand (``python -m ai.genetic_alphabeta.evolution``); never imported
 during games so bot startup stays instant.
+
+This package never imports other bots (architecture rule): fitness games are
+self-play between genomes. To select against Benchmark 2, run an arena script
+from ``another/local_tools/`` on your own machine that pits evolved genomes
+(``bot_config={"genome": ...}``) against ``bench_alphabeta3`` over a paired
+opening suite and keeps the genome whose Elo confidence interval clears zero.
 """
 
 from __future__ import annotations
@@ -93,20 +99,30 @@ def evolve(
     elite: int = 2,
     seed: int | None = None,
     depth: int = GAME_DEPTH,
+    games_per_pair: int = 4,
+    validation_games: int = 4,
 ) -> Genome:
-    """Run tournament selection + uniform crossover + mutation; return best."""
+    """Run tournament selection + uniform crossover + mutation; return best.
+
+    The champion of each generation is validated against DEFAULT_GENOME with a
+    fresh generator (unseen openings) and only replaces the incumbent when it
+    scores >= 0.5, which guards against overfitting to one opening sequence.
+    """
     rng = random.Random(seed)
     population = [random_genome(rng) for _ in range(pop_size)]
     best = DEFAULT_GENOME
-    for _ in range(generations):
+    for generation in range(1, generations + 1):
         scored = []
         for genome in population:
             opponents = [DEFAULT_GENOME, best, rng.choice(population)]
-            scored.append((fitness(genome, opponents, rng, depth=depth), genome))
+            scored.append((fitness(genome, opponents, rng, games_per_pair, depth), genome))
         scored.sort(key=lambda item: item[0], reverse=True)
         challenger = scored[0][1]
-        if fitness(challenger, [best], rng, depth=depth) >= 0.5:
+        validator = random.Random((seed or 0) + generation)
+        check = fitness(challenger, [best], validator, validation_games, depth)
+        if check >= 0.5:
             best = challenger
+        print(f"gen {generation}: train={scored[0][0]:.3f} validate={check:.3f}")
 
         next_pop = [genome for _, genome in scored[: max(2, elite)]]
         while len(next_pop) < pop_size:
@@ -123,8 +139,18 @@ def main() -> None:
     parser.add_argument("--pop", type=int, default=12)
     parser.add_argument("--generations", type=int, default=6)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--depth", type=int, default=GAME_DEPTH)
+    parser.add_argument("--games", type=int, default=4)
+    parser.add_argument("--elite", type=int, default=2)
     args = parser.parse_args()
-    best = evolve(pop_size=args.pop, generations=args.generations, seed=args.seed)
+    best = evolve(
+        pop_size=args.pop,
+        generations=args.generations,
+        seed=args.seed,
+        depth=args.depth,
+        games_per_pair=args.games,
+        elite=args.elite,
+    )
     path = save_genome(best, Path(__file__).with_name(WEIGHTS_FILENAME))
     print(f"Saved {best.to_dict()} to {path}")
 
