@@ -1,0 +1,28 @@
+{
+  "random_100": {
+    "games_replayed": 100,
+    "legal_moves_verified": 4524,
+    "paired_openings_verified": 50,
+    "colors": {
+      "white": 50,
+      "black": 50
+    },
+    "terminations": {
+      "checkmate": 100
+    },
+    "source_hashes_match": true
+  },
+  "pure_10": {
+    "games_replayed": 10,
+    "legal_moves_verified": 1049,
+    "paired_openings_verified": 5,
+    "colors": {
+      "white": 5,
+      "black": 5
+    },
+    "terminations": {
+      "checkmate": 10
+    },
+    "source_hashes_match": true
+  }
+}
