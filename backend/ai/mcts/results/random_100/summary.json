@@ -1,0 +1,46 @@
+{
+  "started_at": "2026-10-15T05:38:03.934142+00:00",
+  "settings": {
+    "games": 100,
+    "seconds": 1.0,
+    "workers": 6,
+    "seed": 20261101,
+    "max_plies": 150,
+    "opening_plies": 2,
+    "opponent": "bench_random",
+    "simulations": null,
+    "pure": false,
+    "output": "/workspace/scratch/8fb97e4c437c/experiments/random_100"
+  },
+  "python": "3.13.16",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+  "chess": "1.11.2",
+  "cpu_count": 9,
+  "sha256": {
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bot.py": "a0311a5a2caeb4bd57cffe488ca808a39121aa9b628a749989cd5e2390aa8579",
+    "evaluation.py": "cc3c5983d35c67c91b3704fe8e065d0c4b009cf71a363648f30f41fb4093380c",
+    "node.py": "e0905703abfe5416198a47f0aa0dc60e0dbe43941ca8100de25e0cf1e8ae28be",
+    "search.py": "798677739050fd03f7c297c8e6c5b68ae5fef730dce3cd24778b450de2d60215"
+  },
+  "games_completed": 100,
+  "errors": 0,
+  "wins": 100,
+  "draws": 0,
+  "losses": 0,
+  "win_rate": 1.0,
+  "score_rate": 1.0,
+  "win_rate_wilson_95": [
+    0.9630065017930143,
+    1.0
+  ],
+  "interval_note": "Descriptive only: paired games are not fully independent.",
+  "target_70_percent_wins_met": true,
+  "mean_move_time_s": 0.9321861297293085,
+  "p95_move_time_s": 0.9760592640000141,
+  "max_move_time_s": 1.3498080350000237,
+  "moves_above_budget": 95,
+  "simulations": 4750028,
+  "rollout_cutoff_ratio": 0.9941732975047726,
+  "wall_time_s": 346.3231248090001
+}

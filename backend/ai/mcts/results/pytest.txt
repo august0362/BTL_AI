@@ -1,0 +1,38 @@
+............................................ss.......................... [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 38%]
+....................................................sss................. [ 50%]
+........................................................................ [ 63%]
+........................................................................ [ 76%]
+........................................................................ [ 89%]
+.............................................................            [100%]
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.16-final-0 _______________
+
+Name                                       Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------
+backend/core/__init__.py                       0      0   100%
+backend/core/config.py                        39      1    97%   61
+backend/core/game_state.py                    74      6    92%   95-101, 115, 117
+backend/core/material.py                       9      0   100%
+backend/core/types.py                         32      0   100%
+backend/tournament/__init__.py                 0      0   100%
+backend/tournament/eta.py                     29      0   100%
+backend/tournament/history.py                 34      0   100%
+backend/tournament/match_runner.py           136     16    88%   31, 34, 40, 89-90, 113-115, 117, 123, 164-169, 172
+backend/tournament/players.py                 46      1    98%   55
+backend/tournament/process_player.py         150     78    48%   31-58, 69-70, 80-117, 126-139, 160-162, 174, 185, 190-191, 197-198, 206-209, 215-216
+backend/tournament/ranking.py                 96      3    97%   123, 137-138
+backend/tournament/records.py                 28      0   100%
+backend/tournament/round_robin.py            336     18    95%   59, 173, 195, 201, 272, 366, 368, 370, 418-419, 444-445, 566, 582, 584, 621, 627-629
+backend/tournament/series.py                 106      8    92%   25, 91, 113-114, 136, 151-154
+backend/tournament/tournament_config.py       73      0   100%
+backend/tournament/tournament_history.py      52      1    98%   21
+------------------------------------------------------------------------
+TOTAL                                       1240    132    89%
+Required test coverage of 80.0% reached. Total coverage: 89.35%
+=========================== short test summary info ============================
+SKIPPED [1] another/tests/ai/test_baseline.py:18: genetic_alphabeta is a real implementation, not a baseline
+SKIPPED [1] another/tests/ai/test_baseline.py:18: mcts is a real implementation, not a baseline
+SKIPPED [3] another/tests/architecture/test_repo_hygiene.py:29: không phải git repo
+560 passed, 5 skipped in 40.78s
