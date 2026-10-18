@@ -14,7 +14,6 @@ for _file in range(2, 6):
 CENTER_SQUARES = frozenset(chess.square(file, rank) for file in range(2, 6) for rank in range(2, 6))
 
 _MATERIAL_TYPES = (chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN)
-_MOBILITY_TYPES = (chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN)
 
 # Squares ahead of `square` for pawn-passed detection, per color.
 _ADJACENT_FILES = [
@@ -53,17 +52,44 @@ def center_count(board: chess.Board, color: chess.Color) -> int:
 def mobility_count(board: chess.Board, color: chess.Color) -> int:
     """Count squares attacked by `color` pieces (excluding own-occupied ones).
 
-    Bitboard-based: far cheaper than enumerating legal moves per leaf node,
-    which used to dominate search time.
+    Uses python-chess attack tables directly, per piece type, instead of
+    ``Board.attacks_mask``: the per-piece type dispatch cost dominated leaf
+    evaluation. Results are identical to the bitboard version.
     """
-    not_own = ~board.occupied_co[color]
+    own = board.occupied_co[color]
+    not_own = ~own
+    occupied = board.occupied
     total = 0
-    for piece_type in _MOBILITY_TYPES:
-        mask = board.pieces_mask(piece_type, color)
-        while mask:
-            low = mask & -mask
-            mask ^= low
-            total += (board.attacks_mask(low.bit_length() - 1) & not_own).bit_count()
+    knights = board.knights & own
+    while knights:
+        square = (knights & -knights).bit_length() - 1
+        knights &= knights - 1
+        total += (chess.BB_KNIGHT_ATTACKS[square] & not_own).bit_count()
+    bishops = board.bishops & own
+    while bishops:
+        square = (bishops & -bishops).bit_length() - 1
+        bishops &= bishops - 1
+        attacks = chess.BB_DIAG_ATTACKS[square][chess.BB_DIAG_MASKS[square] & occupied]
+        total += (attacks & not_own).bit_count()
+    rooks = board.rooks & own
+    while rooks:
+        square = (rooks & -rooks).bit_length() - 1
+        rooks &= rooks - 1
+        attacks = (
+            chess.BB_RANK_ATTACKS[square][chess.BB_RANK_MASKS[square] & occupied]
+            | chess.BB_FILE_ATTACKS[square][chess.BB_FILE_MASKS[square] & occupied]
+        )
+        total += (attacks & not_own).bit_count()
+    queens = board.queens & own
+    while queens:
+        square = (queens & -queens).bit_length() - 1
+        queens &= queens - 1
+        attacks = chess.BB_DIAG_ATTACKS[square][chess.BB_DIAG_MASKS[square] & occupied]
+        attacks |= (
+            chess.BB_RANK_ATTACKS[square][chess.BB_RANK_MASKS[square] & occupied]
+            | chess.BB_FILE_ATTACKS[square][chess.BB_FILE_MASKS[square] & occupied]
+        )
+        total += (attacks & not_own).bit_count()
     return total
 
 
