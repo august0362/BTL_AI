@@ -13,6 +13,7 @@ from ai.genetic_alphabeta.genome import Genome
 
 MATE_SCORE = 100000.0
 TIE_EPS = 1e-9
+ROOT_TIE_MARGIN = 1e-6
 MAX_QUIESCENCE_PLIES = 8
 MAX_CHECK_EXTENSIONS = 2
 DEFAULT_TT_ENTRIES = 65536
@@ -140,20 +141,23 @@ def _quiesce(
             if alpha >= beta:
                 break
         return best
-    if not any(board.generate_legal_moves()):
-        return 0.0
-    if ply >= MAX_QUIESCENCE_PLIES:
-        return _static(board, genome)
     stand_pat = _static(board, genome)
+    if ply >= MAX_QUIESCENCE_PLIES:
+        if not any(board.generate_legal_moves()):
+            return 0.0
+        return stand_pat
+    # Generate captures once; stalemate is only possible when there are none.
+    captures = sorted(
+        board.generate_legal_captures(),
+        key=lambda move: _move_order_key(board, move, genome),
+    )
+    if not captures and not any(board.generate_legal_moves()):
+        return 0.0
     if stand_pat >= beta:
         return stand_pat
     best = stand_pat
     if stand_pat > alpha:
         alpha = stand_pat
-    captures = sorted(
-        board.generate_legal_captures(),
-        key=lambda move: _move_order_key(board, move, genome),
-    )
     for move in captures:
         # Delta pruning: a capture whose victim cannot recover alpha is hopeless.
         if move.promotion is None:
@@ -197,7 +201,7 @@ def _negamax(
     _check_deadline(stats, deadline)
     if board.is_insufficient_material() or board.halfmove_clock >= 100:
         return 0.0
-    if board.halfmove_clock >= 4 and board.can_claim_draw():
+    if board.halfmove_clock >= 4 and board.is_repetition(3):
         return 0.0
     if board.is_check() and extensions > 0 and depth > 0:
         depth += 1
@@ -286,7 +290,12 @@ def _root(
     quiescence: bool = True,
     deadline: float | None = None,
 ) -> tuple[chess.Move, float]:
-    """Search every root move; return (best move, side-to-move score)."""
+    """Search every root move; return (best move, side-to-move score).
+
+    The root narrows alpha as the best score improves, but keeps a tiny
+    ``ROOT_TIE_MARGIN`` slack so moves tying the best still get exact scores and
+    can be collected for random tie-breaking.
+    """
     tt_move: chess.Move | None = None
     if tt is not None:
         entry = tt.get(zobrist_hash(board))
@@ -296,6 +305,7 @@ def _root(
     moves = ordered_moves(board, genome, tt_move, killer)
     candidates: list[chess.Move] = []
     best_score = -MATE_SCORE - 1.0
+    alpha = -MATE_SCORE - 1.0
     for move in moves:
         board.push(move)
         try:
@@ -304,7 +314,7 @@ def _root(
                 genome,
                 depth - 1,
                 -MATE_SCORE - 1.0,
-                MATE_SCORE + 1.0,
+                -(alpha - ROOT_TIE_MARGIN),
                 1,
                 stats,
                 tt,
@@ -320,6 +330,8 @@ def _root(
             candidates = [move]
         elif abs(score - best_score) <= TIE_EPS:
             candidates.append(move)
+        if score > alpha:
+            alpha = score
     chosen = rng.choice(candidates) if rng is not None else candidates[0]
     if tt is not None:
         tt.store(zobrist_hash(board), depth, best_score, EXACT, chosen)
