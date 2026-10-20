@@ -1,0 +1,10 @@
+{
+  "pawn_diff": 0.35,
+  "knight_diff": 0.65,
+  "bishop_diff": 0.60,
+  "rook_diff": 1.00,
+  "queen_diff": 1.80,
+  "mobility_diff": 0.12,
+  "center_control_diff": 0.10,
+  "pawn_advance_diff": 0.08
+}

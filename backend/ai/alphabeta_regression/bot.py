@@ -2,6 +2,8 @@
 
 import chess
 
+from ai.alphabeta_regression.evaluate import evaluate
+from ai.alphabeta_regression.feature import extract_features
 from ai.base_bot import BaseBot
 
 
@@ -10,16 +12,22 @@ class AlphaBetaRegressionBot(BaseBot):
 
     bot_id = "alphabeta_regression"
     display_name = "Alpha-Beta Regression"
+    _MIN_DEPTH = 1
+    _MAX_DEPTH = 6
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
-        default_depth = 3 if self.config.get("fast_mode") else 2
-        self._depth = max(1, int(self.config.get("depth", default_depth)))
+        default_depth = 1 if self.config.get("fast_mode") else 3
+        try:
+            configured_depth = int(self.config.get("depth", default_depth))
+        except (TypeError, ValueError):
+            configured_depth = default_depth
+        self._depth = max(self._MIN_DEPTH, min(self._MAX_DEPTH, configured_depth))
         self._nodes = 0
 
     def select_move(self, board: chess.Board) -> chess.Move:
         """Return the legal move with the best alpha-beta score."""
-        moves = sorted(board.legal_moves, key=lambda move: move.uci())
+        moves = self._ordered_moves(board)
         if not moves:
             raise ValueError("Cannot select a move from a board without legal moves")
 
@@ -63,9 +71,9 @@ class AlphaBetaRegressionBot(BaseBot):
     ) -> float:
         self._nodes += 1
         if depth == 0 or board.is_game_over():
-            return self._evaluate(board, root_color)
+            return evaluate(extract_features(board), root_color)
 
-        moves = sorted(board.legal_moves, key=lambda move: move.uci())
+        moves = self._ordered_moves(board)
         maximizing = board.turn == root_color
 
         if maximizing:
@@ -95,26 +103,31 @@ class AlphaBetaRegressionBot(BaseBot):
                 break
         return value
 
-    def _evaluate(self, board: chess.Board, root_color: chess.Color) -> float:
-        if board.is_checkmate():
-            return float("inf") if board.turn != root_color else float("-inf")
-        if board.is_game_over():
-            return 0.0
-        score = self.linear_regression(board)
-        return score if root_color == chess.WHITE else -score
+    def _ordered_moves(self, board: chess.Board) -> list[chess.Move]:
+        """Order forcing moves first so alpha-beta can prune more branches."""
+        return sorted(
+            board.legal_moves,
+            key=lambda move: (
+                -self._move_order_score(board, move),
+                move.uci(),
+            ),
+        )
 
-    def linear_regression(self, board: chess.Board) -> float:
-        """Return the material score from White's point of view."""
-        piece_values = {
-            chess.PAWN: 10,
-            chess.KNIGHT: 30,
-            chess.BISHOP: 30,
-            chess.ROOK: 50,
-            chess.QUEEN: 90,
-            chess.KING: 900,
-        }
+    @staticmethod
+    def _move_order_score(board: chess.Board, move: chess.Move) -> int:
+        """Score captures, promotions, and checks for search ordering."""
         score = 0
-        for piece_type, value in piece_values.items():
-            score += len(board.pieces(piece_type, chess.WHITE)) * value
-            score -= len(board.pieces(piece_type, chess.BLACK)) * value
-        return float(score)
+        if board.is_capture(move):
+            victim = board.piece_at(move.to_square)
+            if victim is None and board.is_en_passant(move):
+                victim_value = 1
+            else:
+                victim_value = 0 if victim is None else victim.piece_type
+            attacker = board.piece_at(move.from_square)
+            attacker_value = 0 if attacker is None else attacker.piece_type
+            score += 100 * victim_value - attacker_value
+        if move.promotion is not None:
+            score += 90
+        if board.gives_check(move):
+            score += 80
+        return score
