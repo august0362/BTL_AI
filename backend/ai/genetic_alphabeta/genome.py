@@ -19,15 +19,27 @@ GENOME_FIELDS = (
     "center",
     "mobility",
     "shield",
+    "doubled",
+    "isolated",
+    "passed",
+    "bishop_pair",
+    "rook_open",
+    "tempo",
 )
+
+LEGACY_FIELD_COUNT = 8
 
 
 @dataclass(frozen=True)
 class Genome:
     """Weights of the static evaluation function (pawn units, White POV diffs).
 
-    The first five fields are piece values. The last three scale positional
-    terms: central control, move-count mobility and pawn shield around the king.
+    The first five fields are piece values. The next three scale positional
+    terms: central control, mobility and pawn shield around the king. The last
+    six mirror the Benchmark 4 "advanced" ideas as positive magnitudes:
+    doubled/isolated pawn penalties, passed pawn bonus, bishop-pair bonus,
+    rook open-file bonus and side-to-move tempo. Penalties are subtracted in
+    the evaluator so every field stays >= 0 and mutation floors hold.
     Frozen so bot instances can safely share a genome between games.
     """
 
@@ -39,6 +51,12 @@ class Genome:
     center: float = 0.12
     mobility: float = 0.02
     shield: float = 0.10
+    doubled: float = 0.15
+    isolated: float = 0.15
+    passed: float = 0.10
+    bishop_pair: float = 0.30
+    rook_open: float = 0.20
+    tempo: float = 0.05
 
     def piece_value(self, piece_type: chess.PieceType) -> float:
         """Return the configured value of a piece type (king scores 0)."""
@@ -62,6 +80,8 @@ class Genome:
     @classmethod
     def from_list(cls, values: list[float]) -> Genome:
         """Build a genome from a GENOME_FIELDS-ordered value list."""
+        if len(values) == LEGACY_FIELD_COUNT:
+            values = [*values, *[getattr(cls(), name) for name in GENOME_FIELDS[8:]]]
         if len(values) != len(GENOME_FIELDS):
             raise ValueError(f"Expected {len(GENOME_FIELDS)} values, got {len(values)}")
         return cls(**{name: float(v) for name, v in zip(GENOME_FIELDS, values, strict=True)})
@@ -99,6 +119,12 @@ def random_genome(rng: random.Random) -> Genome:
         center=rng.uniform(0.0, 0.25),
         mobility=rng.uniform(0.0, 0.05),
         shield=rng.uniform(0.0, 0.25),
+        doubled=rng.uniform(0.0, 0.3),
+        isolated=rng.uniform(0.0, 0.3),
+        passed=rng.uniform(0.0, 0.25),
+        bishop_pair=rng.uniform(0.0, 0.6),
+        rook_open=rng.uniform(0.0, 0.4),
+        tempo=rng.uniform(0.0, 0.1),
     )
 
 
