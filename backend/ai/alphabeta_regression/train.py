@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 import random
 import sys
 from dataclasses import dataclass
@@ -46,12 +47,24 @@ def train(
     validation_fraction: float = 0.2,
     seed: int = 0,
     standardize: bool = True,
+    prior_weights_path: Path | None = None,
+    prior_strength: float | None = None,
 ) -> TrainingResult:
-    """Fit a grouped regression model and export model and runtime weights."""
+    """Fit a grouped regression model and export model and runtime weights.
+
+    Ridge training is regularized toward ``prior_weights_path``; a strength of zero
+    recovers ordinary Ridge regression.
+    """
     if model_type not in {"linear", "ridge"}:
         raise ValueError("model_type must be 'linear' or 'ridge'")
+    if prior_strength is None:
+        prior_strength = 1.0 if model_type == "ridge" else 0.0
     if alpha < 0:
         raise ValueError("alpha must be non-negative")
+    if prior_strength < 0:
+        raise ValueError("prior_strength must be non-negative")
+    if model_type == "linear" and prior_strength > 0:
+        raise ValueError("prior_strength must be zero when model_type is 'linear'")
     if not 0 < validation_fraction < 1:
         raise ValueError("validation_fraction must be between 0 and 1")
 
@@ -62,10 +75,20 @@ def train(
     validation_matrix = [
         _transform(position.values, means, scales) for position in validation_positions
     ]
+    if prior_weights_path is None:
+        prior_weights_path = Path(__file__).with_name("weight.json")
+    prior_weights = _read_prior_weights(prior_weights_path) if prior_strength > 0 else None
+    prior_coefficients = (
+        [weight * scale for weight, scale in zip(prior_weights, scales, strict=True)]
+        if prior_weights is not None
+        else None
+    )
     coefficients, intercept = _fit_regression(
         train_matrix,
         [position.target for position in train_positions],
         alpha if model_type == "ridge" else 0.0,
+        prior_coefficients,
+        prior_strength if model_type == "ridge" else 0.0,
     )
     validation_predictions = [
         _predict(values, coefficients, intercept) for values in validation_matrix
@@ -85,6 +108,8 @@ def train(
             "scale": scales,
         },
         "alpha": alpha if model_type == "ridge" else 0.0,
+        "prior_weights": str(prior_weights_path) if prior_strength > 0 else None,
+        "prior_strength": prior_strength if model_type == "ridge" else 0.0,
         "train_games": len({position.game_id for position in train_positions}),
         "validation_games": len({position.game_id for position in validation_positions}),
         "validation_mse": validation_mse,
@@ -150,6 +175,26 @@ def _read_positions(dataset_path: Path) -> list[Position]:
     return positions
 
 
+def _read_prior_weights(weight_path: Path) -> list[float]:
+    """Read prior raw-feature coefficients in the evaluator's feature order."""
+    try:
+        raw_weights = json.loads(weight_path.read_text(encoding="utf-8"))
+        if not isinstance(raw_weights, dict):
+            raise ValueError("weights must be a JSON object")
+        weights = []
+        for name in FEATURE_NAMES:
+            value = raw_weights.get(name, 0.0)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{name} must be numeric")
+            weight = float(value)
+            if not math.isfinite(weight):
+                raise ValueError(f"{name} must be finite")
+            weights.append(weight)
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid prior weights in {weight_path}: {exc}") from exc
+    return weights
+
+
 def _split_by_game(
     positions: list[Position],
     validation_fraction: float,
@@ -203,8 +248,10 @@ def _fit_regression(
     matrix: list[list[float]],
     targets: list[float],
     alpha: float,
+    prior_coefficients: list[float] | None = None,
+    prior_strength: float = 0.0,
 ) -> tuple[list[float], float]:
-    """Fit linear or Ridge regression by solving its normal equations."""
+    """Fit regression, optionally regularizing coefficients toward a prior."""
     feature_count = len(FEATURE_NAMES)
     augmented = [[1.0, *row] for row in matrix]
     gram = [
@@ -217,6 +264,9 @@ def _fit_regression(
     ]
     for index in range(1, feature_count + 1):
         gram[index][index] += alpha
+        if prior_coefficients is not None and prior_strength > 0:
+            gram[index][index] += prior_strength
+            rhs[index] += prior_strength * prior_coefficients[index - 1]
     solution = _solve(gram, rhs)
     return solution[1:], solution[0]
 
@@ -281,6 +331,18 @@ def main() -> None:
     parser.add_argument("--validation-fraction", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--no-standardize", action="store_true")
+    parser.add_argument(
+        "--prior-weights",
+        type=Path,
+        default=Path(__file__).with_name("weight.json"),
+        help="Raw-feature weights to use as the Ridge prior",
+    )
+    parser.add_argument(
+        "--prior-strength",
+        type=float,
+        default=None,
+        help="Penalty strength toward prior weights (Ridge default: 1; use 0 to disable)",
+    )
     args = parser.parse_args()
     result = train(
         args.dataset_path,
@@ -291,6 +353,8 @@ def main() -> None:
         validation_fraction=args.validation_fraction,
         seed=args.seed,
         standardize=not args.no_standardize,
+        prior_weights_path=args.prior_weights,
+        prior_strength=args.prior_strength,
     )
     print(f"Train games: {result.train_games}")
     print(f"Validation games: {result.validation_games}")

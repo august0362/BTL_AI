@@ -17,6 +17,10 @@ class BoardFeatures:
     mobility_diff: int
     center_control_diff: int
     pawn_advance_diff: int
+    minor_development_diff: int
+    early_queen_development_diff: int
+    center_occupancy_diff: int
+    castled_diff: int
     turn: chess.Color
     is_checkmate: bool
     is_game_over: bool
@@ -35,6 +39,17 @@ def extract_features(board: chess.Board) -> BoardFeatures:
             _center_control(board, chess.WHITE) - _center_control(board, chess.BLACK)
         ),
         pawn_advance_diff=(_pawn_advance(board, chess.WHITE) - _pawn_advance(board, chess.BLACK)),
+        minor_development_diff=(
+            _minor_development(board, chess.WHITE) - _minor_development(board, chess.BLACK)
+        ),
+        early_queen_development_diff=(
+            _early_queen_development(board, chess.WHITE)
+            - _early_queen_development(board, chess.BLACK)
+        ),
+        center_occupancy_diff=(
+            _center_occupancy(board, chess.WHITE) - _center_occupancy(board, chess.BLACK)
+        ),
+        castled_diff=int(_has_castled(board, chess.WHITE)) - int(_has_castled(board, chess.BLACK)),
         turn=board.turn,
         is_checkmate=board.is_checkmate(),
         is_game_over=board.is_game_over(),
@@ -68,3 +83,43 @@ def _pawn_advance(board: chess.Board, color: chess.Color) -> int:
         rank = chess.square_rank(square)
         advance += rank - 1 if color == chess.WHITE else 6 - rank
     return advance
+
+
+def _minor_development(board: chess.Board, color: chess.Color) -> int:
+    """Count knights and bishops that have left their original squares."""
+    home_squares = (
+        (chess.B1, chess.G1, chess.C1, chess.F1)
+        if color == chess.WHITE
+        else (chess.B8, chess.G8, chess.C8, chess.F8)
+    )
+    home = set(home_squares)
+    developed = 0
+    for piece_type in (chess.KNIGHT, chess.BISHOP):
+        developed += sum(square not in home for square in board.pieces(piece_type, color))
+    return developed
+
+
+def _early_queen_development(board: chess.Board, color: chess.Color) -> int:
+    """Count queens developed before two minor pieces during the first ten moves."""
+    if board.fullmove_number > 10 or _minor_development(board, color) >= 2:
+        return 0
+    home_square = chess.D1 if color == chess.WHITE else chess.D8
+    return sum(square != home_square for square in board.pieces(chess.QUEEN, color))
+
+
+def _center_occupancy(board: chess.Board, color: chess.Color) -> int:
+    """Count a side's pieces occupying the four central squares."""
+    center_squares = (chess.D4, chess.E4, chess.D5, chess.E5)
+    return sum(
+        (piece := board.piece_at(square)) is not None and piece.color == color
+        for square in center_squares
+    )
+
+
+def _has_castled(board: chess.Board, color: chess.Color) -> bool:
+    """Return whether the king occupies a normal castled square."""
+    king_square = board.king(color)
+    if king_square is None:
+        return False
+    rank = 0 if color == chess.WHITE else 7
+    return king_square in (chess.square(2, rank), chess.square(6, rank))
