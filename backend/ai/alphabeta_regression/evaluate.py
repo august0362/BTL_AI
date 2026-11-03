@@ -19,6 +19,10 @@ FEATURE_NAMES = (
     "mobility_diff",
     "center_control_diff",
     "pawn_advance_diff",
+    "minor_development_diff",
+    "early_queen_development_diff",
+    "center_occupancy_diff",
+    "castled_diff",
 )
 
 
@@ -70,6 +74,10 @@ def evaluate(features: BoardFeatures, root_color: chess.Color) -> float:
         features.mobility_diff,
         features.center_control_diff,
         features.pawn_advance_diff,
+        features.minor_development_diff,
+        features.early_queen_development_diff,
+        features.center_occupancy_diff,
+        features.castled_diff,
     )
     score = sum(
         weight * value for weight, value in zip(_load_weights().values(), values, strict=True)

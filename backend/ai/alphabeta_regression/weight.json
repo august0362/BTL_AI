@@ -1,10 +1,14 @@
 {
-  "pawn_diff": 0.35,
-  "knight_diff": 0.65,
-  "bishop_diff": 0.60,
-  "rook_diff": 1.00,
-  "queen_diff": 1.80,
-  "mobility_diff": 0.12,
-  "center_control_diff": 0.10,
-  "pawn_advance_diff": 0.08
+  "pawn_diff": 0.16254395412283693,
+  "knight_diff": 0.19057670165752705,
+  "bishop_diff": 0.2365367227297235,
+  "rook_diff": 0.3889048676475148,
+  "queen_diff": 0.6225788205208632,
+  "mobility_diff": 0.0070444813447861345,
+  "center_control_diff": 0.011561382187803764,
+  "pawn_advance_diff": 0.013423143982138683,
+  "minor_development_diff": 0.02098197147662487,
+  "early_queen_development_diff": -0.06736640327171242,
+  "center_occupancy_diff": -0.013197660998946252,
+  "castled_diff": 0.053146806022384516
 }
