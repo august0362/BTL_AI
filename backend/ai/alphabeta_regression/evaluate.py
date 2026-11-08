@@ -16,13 +16,33 @@ FEATURE_NAMES = (
     "bishop_diff",
     "rook_diff",
     "queen_diff",
+    "bishop_pair_diff",
+    "phase",
+    "pawn_square_diff",
+    "knight_square_diff",
+    "bishop_square_diff",
+    "rook_square_diff",
+    "queen_square_diff",
+    "king_square_diff",
     "mobility_diff",
+    "safe_mobility_diff",
     "center_control_diff",
-    "pawn_advance_diff",
-    "minor_development_diff",
-    "early_queen_development_diff",
-    "center_occupancy_diff",
-    "castled_diff",
+    "strategic_control_diff",
+    "passed_pawn_diff",
+    "passed_pawn_advance_diff",
+    "isolated_pawn_diff",
+    "doubled_pawn_diff",
+    "backward_pawn_diff",
+    "protected_pawn_diff",
+    "king_attackers_diff",
+    "pawn_shield_diff",
+    "middlegame_king_safety_diff",
+    "endgame_king_activity_diff",
+    "protected_piece_value_diff",
+    "hanging_piece_value_diff",
+    "rook_open_file_diff",
+    "rook_semi_open_file_diff",
+    "knight_outpost_diff",
 )
 
 
@@ -65,20 +85,7 @@ def evaluate(features: BoardFeatures, root_color: chess.Color) -> float:
     if features.is_game_over:
         return 0.0
 
-    values = (
-        features.pawn_diff,
-        features.knight_diff,
-        features.bishop_diff,
-        features.rook_diff,
-        features.queen_diff,
-        features.mobility_diff,
-        features.center_control_diff,
-        features.pawn_advance_diff,
-        features.minor_development_diff,
-        features.early_queen_development_diff,
-        features.center_occupancy_diff,
-        features.castled_diff,
-    )
+    values = tuple(getattr(features, name) for name in FEATURE_NAMES)
     score = sum(
         weight * value for weight, value in zip(_load_weights().values(), values, strict=True)
     )
