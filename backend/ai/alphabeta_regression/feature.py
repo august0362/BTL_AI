@@ -16,9 +16,7 @@ PIECE_VALUES = {
 _PHASE_MAX = 24
 _CENTER = {chess.D4, chess.E4, chess.D5, chess.E5}
 _EXTENDED_CENTER = {
-    chess.square(file_index, rank_index)
-    for file_index in range(2, 6)
-    for rank_index in range(2, 6)
+    chess.square(file_index, rank_index) for file_index in range(2, 6) for rank_index in range(2, 6)
 }
 
 
@@ -90,16 +88,14 @@ def extract_features(board: chess.Board) -> BoardFeatures:
         - _passed_pawns(board, chess.BLACK)[1],
         isolated_pawn_diff=_isolated_pawns(board, chess.WHITE)
         - _isolated_pawns(board, chess.BLACK),
-        doubled_pawn_diff=_doubled_pawns(board, chess.WHITE)
-        - _doubled_pawns(board, chess.BLACK),
+        doubled_pawn_diff=_doubled_pawns(board, chess.WHITE) - _doubled_pawns(board, chess.BLACK),
         backward_pawn_diff=_backward_pawns(board, chess.WHITE)
         - _backward_pawns(board, chess.BLACK),
         protected_pawn_diff=_protected_pawns(board, chess.WHITE)
         - _protected_pawns(board, chess.BLACK),
         king_attackers_diff=_king_attackers(board, chess.BLACK)
         - _king_attackers(board, chess.WHITE),
-        pawn_shield_diff=_pawn_shield(board, chess.WHITE)
-        - _pawn_shield(board, chess.BLACK),
+        pawn_shield_diff=_pawn_shield(board, chess.WHITE) - _pawn_shield(board, chess.BLACK),
         middlegame_king_safety_diff=(
             _king_safety(board, chess.WHITE) - _king_safety(board, chess.BLACK)
         )
@@ -119,8 +115,7 @@ def extract_features(board: chess.Board) -> BoardFeatures:
         knight_outpost_diff=_knight_outposts(board, chess.WHITE)
         - _knight_outposts(board, chess.BLACK),
         mobility_diff=_mobility(board, chess.WHITE) - _mobility(board, chess.BLACK),
-        safe_mobility_diff=_safe_mobility(board, chess.WHITE)
-        - _safe_mobility(board, chess.BLACK),
+        safe_mobility_diff=_safe_mobility(board, chess.WHITE) - _safe_mobility(board, chess.BLACK),
         turn=board.turn,
         is_checkmate=board.is_checkmate(),
         is_game_over=board.is_game_over(),
@@ -255,10 +250,7 @@ def _backward_pawns(board: chess.Board, color: chess.Color) -> int:
 
 
 def _protected_pawns(board: chess.Board, color: chess.Color) -> int:
-    return sum(
-        board.is_attacked_by(color, square)
-        for square in board.pieces(chess.PAWN, color)
-    )
+    return sum(board.is_attacked_by(color, square) for square in board.pieces(chess.PAWN, color))
 
 
 def _king_attackers(board: chess.Board, color: chess.Color) -> int:
@@ -325,16 +317,13 @@ def _hanging_piece_value(board: chess.Board, color: chess.Color) -> int:
         PIECE_VALUES[piece_type]
         for piece_type in PIECE_VALUES
         for square in board.pieces(piece_type, color)
-        if board.is_attacked_by(not color, square)
-        and not board.is_attacked_by(color, square)
+        if board.is_attacked_by(not color, square) and not board.is_attacked_by(color, square)
     )
 
 
 def _rook_files(board: chess.Board, color: chess.Color, kind: str) -> int:
     own_pawn_files = {chess.square_file(square) for square in board.pieces(chess.PAWN, color)}
-    enemy_pawn_files = {
-        chess.square_file(square) for square in board.pieces(chess.PAWN, not color)
-    }
+    enemy_pawn_files = {chess.square_file(square) for square in board.pieces(chess.PAWN, not color)}
     if kind == "open":
         return sum(
             chess.square_file(square) not in own_pawn_files | enemy_pawn_files
