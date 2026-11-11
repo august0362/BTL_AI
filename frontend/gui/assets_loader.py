@@ -1,4 +1,4 @@
-"""Load cached board artwork and choose a font for the GUI."""
+"""Load cached board artwork and the bundled GUI fonts."""
 
 from __future__ import annotations
 
@@ -18,16 +18,39 @@ def piece_image(piece_set: str, name: str, size: int) -> pygame.Surface:
     return pygame.transform.smoothscale(image, (size, size))
 
 
-def get_font(size: int, *, bold: bool = False) -> pygame.font.Font:
-    """Pick an installed system font with broad Latin and Vietnamese coverage."""
+FONT_DIR = ASSET_DIR / "fonts"
+_DISPLAY_FONT = FONT_DIR / "Syne-Bold.ttf"  # Latin only: no Vietnamese tone marks
+
+
+@lru_cache(maxsize=192)
+def _load_font(path: str, size: int) -> pygame.font.Font:
+    return pygame.font.Font(path, size)
+
+
+def clear_font_cache() -> None:
+    """Drop cached fonts; they become invalid once pygame's font module restarts."""
+    _load_font.cache_clear()
+
+
+def get_font(size: int, *, bold: bool = False, semibold: bool = False) -> pygame.font.Font:
+    """Return the bundled Inter font (full Vietnamese coverage) at the current UI scale."""
     from gui.render import FONT_SCALE
 
     size = max(1, round(size * FONT_SCALE))
-    for name in ("segoeui", "arial", "dejavusans"):
-        path = pygame.font.match_font(name, bold=bold)
-        if path:
-            return pygame.font.Font(path, size)
+    name = "Inter-Bold.ttf" if bold else "Inter-SemiBold.ttf" if semibold else "Inter-Regular.ttf"
+    path = FONT_DIR / name
+    if path.is_file():
+        return _load_font(str(path), size)
     return pygame.font.Font(None, size)
+
+
+def get_display_font(size: int, text: str = "") -> pygame.font.Font:
+    """Return the Syne display face, or bold Inter when ``text`` needs Vietnamese marks."""
+    from gui.render import FONT_SCALE
+
+    if text.isascii() and _DISPLAY_FONT.is_file():
+        return _load_font(str(_DISPLAY_FONT), max(1, round(size * FONT_SCALE)))
+    return get_font(size, bold=True)
 
 
 # fit word to a given width, scaling down if necessary

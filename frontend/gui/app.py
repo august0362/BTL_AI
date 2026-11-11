@@ -11,6 +11,7 @@ import pygame
 import gui.render as render_module
 from ai import registry
 from core.config import LOCAL_CONFIG_PATH, get_bot_config, load_config, save_local_config
+from gui.assets_loader import clear_font_cache
 from gui.controller import GameController
 from gui.i18n import Translator
 from gui.render import Render
@@ -87,6 +88,7 @@ class App:
         self.renderer = Render(self.physical_canvas, self.render_scale)
         self.canvas = self.renderer
         Render.font.cache_clear()
+        clear_font_cache()
         render_module.FONT_SCALE = self.render_scale
         ui = self.config.setdefault("ui", {})
         theme_id = ui.get("theme", "dark_winter")  # base theme is dark winter
@@ -389,6 +391,7 @@ class App:
         self.renderer = Render(self.physical_canvas, self.render_scale)
         self.canvas = self.renderer
         Render.font.cache_clear()
+        clear_font_cache()
         render_module.FONT_SCALE = self.render_scale
 
     def quit(self) -> None:

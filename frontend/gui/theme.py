@@ -32,52 +32,36 @@ class Theme:
         return relative_luminance(self.roles["bg"]) < 0.18
 
 
-# Redesigned palettes based on modern, aesthetic Canva product templates
+# Two handpicked themes: Cyber Frost (dark) and Frost Light (light).
 # Ordered strictly from Darkest to Lightest for harmonious algorithmic generation
 PALETTES: dict[str, tuple[str, str, str, str]] = {
-    # Inspired by Matcha/Sage green product designs (Earthy, calming)
-    "dark_winter": ("#1B291C", "#3C5740", "#98A88E", "#F3F6EB"),
-    # Inspired by Lavender/Purple midnight cosmetics (Mysterious, elegant)
-    "dark_cold": ("#2A1E35", "#513B6B", "#A895C2", "#F5F3F7"),
-    # Inspired by Clean minimalist UI / Sky blue (Fresh, airy)
-    "cold": ("#1E2A38", "#53708F", "#B2C5D8", "#F0F4F8"),
-    # Inspired by Mocha/Chocolate flyers (Warm, rich, appetizing)
-    "fall": ("#3E2211", "#7A4E35", "#D2B49E", "#FAF4F0"),
-    # Inspired by Blush pink/Skincare highlights (Soft, sweet, inviting)
-    "summer": ("#4A1C22", "#A65A68", "#E6ACB4", "#FDF5F5"),
-    # Inspired by Beige minimalist aesthetic/Tote bags (Neutral, sophisticated)
-    "winter": ("#242322", "#6B6661", "#C4BFBA", "#F5F3EF"),
+    # Cyber Frost: Black Pine, Deep Ocean, Windstorm, Avalanche
+    "dark_winter": ("#0A151B", "#1B3D59", "#6A97C0", "#D4EEF8"),
+    # Frost Light: the daytime variant of Cyber Frost
+    "cold": ("#0F1E2A", "#336288", "#9ECBF7", "#EEF4F9"),
+    # Violet Nightfall: Ink Shadow, Indigo Night, Violet Mist, Pale Lilac
+    "dark_cold": ("#090B0C", "#2F3559", "#7272B0", "#DCD5E5"),
+    # Lantern Night: Tobi Brown, Apple Blossom, Bonfire, Buttermilk
+    "fall": ("#482420", "#B24D37", "#F78358", "#FFEEB0"),
+    # Periwinkle: Mystification, Orbital, Gladeye, First Snow
+    "periwinkle": ("#2E3E6D", "#7087BB", "#A2B7E4", "#E5EDFA"),
+    # Cherry Blossom: Indochine, Cinnamon Brandy, Hush Puppy, Lace Veil
+    "summer": ("#9C5C34", "#D08F6B", "#E5B194", "#EBEBEA"),
+    # Muted Romance: Twilight Navy, Dusty Rose, Lavender Mist, Almond Blush
+    "winter": ("#4D516D", "#A8868C", "#B5A4B4", "#D3BCB6"),
 }
 
 NAMES: dict[str, tuple[str, str]] = {
-    "dark_winter": ("Trà Xanh", "Matcha Latte"),
-    "dark_cold": ("Oải Hương", "Deep Lavender"),
-    "cold": ("Bầu Trời", "Aesthetic Sky"),
-    "fall": ("Cà Phê", "Mocha Chocolate"),
-    "summer": ("Mỹ Phẩm", "Blush Pink"),
-    "winter": ("Tối Giản", "Minimalist Beige"),
+    "dark_winter": ("Băng Giá", "Cyber Frost"),
+    "cold": ("Băng Sáng", "Frost Light"),
+    "dark_cold": ("Tím Đêm", "Violet Nightfall"),
+    "fall": ("Đèn Lồng", "Lantern Night"),
+    "periwinkle": ("Thiên Thanh", "Periwinkle"),
+    "summer": ("Hoa Anh Đào", "Cherry Blossom"),
+    "winter": ("Chiều Tím", "Muted Romance"),
 }
 
-COLOR_HUNT_NAMES: dict[str, tuple[str, str]] = {
-    "ch_3368a0": ("Biển sương", "Coastal Mist"),
-    "ch_3e0f8d": ("Hoàng hôn tím", "Violet Dusk"),
-    "ch_499a13": ("Lá xuân", "Spring Leaf"),
-    "ch_601d49": ("Mận chín", "Plum"),
-    "ch_a5b68d": ("Đồng cỏ", "Meadow"),
-    "ch_bf9264": ("Vườn ô liu", "Olive Grove"),
-    "ch_e4e0e1": ("Cà phê", "Coffee"),
-    "ch_fbdb93": ("Rượu vang", "Wine"),
-    "ch_fbefef": ("Anh đào", "Sakura"),
-    "ch_fdf4d2": ("Oải hương", "Lavender"),
-    "ch_ff9d9d": ("Kem trái cây", "Sorbet"),
-    "ch_ffcdb2": ("Đào", "Peach"),
-    "ch_ffdab3": ("Chiều tà", "Dusk"),
-    "ch_ffdcdc": ("Sữa dâu", "Strawberry Milk"),
-    "ch_ffeecc": ("Kẹo bông", "Cotton Candy"),
-    "ch_fff2c6": ("Mây trời", "Daydream"),
-    "ch_fff2d7": ("Cát vàng", "Sand"),
-    "ch_fff8e8": ("Giấy cổ", "Parchment"),
-}
+COLOR_HUNT_NAMES: dict[str, tuple[str, str]] = {}
 
 
 def _rgb(value: str) -> tuple[int, int, int]:
@@ -389,6 +373,7 @@ def derive_theme(
         "board_hint": _visible_on_board(darken(board_dark, 0.20), board_squares),
     }
     roles["on_danger"] = _foreground(roles["danger"])
+    _with_frost_roles(roles)
     fallback_name = f"Color Hunt #{theme_id.removeprefix('ch_')}"
     return Theme(
         theme_id,
@@ -399,54 +384,222 @@ def derive_theme(
     )
 
 
-def _handpicked_dark_winter() -> Theme:
-    """Build the new Matcha (dark_winter) palette with curated Canva-style visual balance."""
-    # Updated to the beautiful earthy matcha tone from the palette
-    colors = PALETTES["dark_winter"]
-    roles = {
-        "bg": "#1B291C",  # Deep rich forest black-green
-        "surface": "#243625",  # Smooth elevated leaf tone
-        "surface_alt": "#2E4530",  # Subtle tertiary background
-        "border": "#3C5740",  # Soft integrated border
-        "text": "#F3F6EB",  # Creamy matcha milk text
-        "text_muted": "#98A88E",  # Sage green muted text
-        "text_disabled": "#5A6D56",  # Deep olive disabled text
-        "primary": "#4C6B45",  # Bold leaf green
-        "primary_hover": "#5A7D52",  # Lighter pop for hover
-        "on_primary_hover": "#F3F6EB",
+# Curated roles for the palettes of the Stitch "Cyber Frost Chess AI" design.
+_HANDPICKED_ROLES: dict[str, dict[str, str]] = {
+    "dark_winter": {
+        "bg": "#0A151B",  # Black Pine night
+        "surface": "#121D23",  # Frosted card
+        "surface_alt": "#1D2A33",  # Raised row / selected row
+        "border": "#2B3A45",  # Glass edge
+        "text": "#D8E4EC",
+        "text_muted": "#93A3B0",
+        "text_disabled": "#4F5E69",
+        "primary": "#9ECBF7",  # Ice blue call to action
+        "primary_hover": "#BBDCFB",
+        "on_primary_hover": "#002A45",
+        "on_primary": "#002E4B",
+        "secondary": "#1B3D59",  # Deep Ocean
+        "secondary_hover": "#284A61",
+        "on_secondary_hover": "#E5EDFA",
+        "on_secondary": "#D4EEF8",
+        "accent": "#6A97C0",  # Windstorm
+        "on_accent": "#001D32",
+        "attention": "#F3EED8",  # Sun Beam
+        "danger": "#FFB4AB",
+        "board_light": "#D4EEF8",  # Avalanche
+        "board_dark": "#4F7699",  # Windstorm, deep enough for both piece colors
+        "board_select": "#9ECBF7",
+        "board_last": "#6A97C0",
+        "board_hint": "#0A151B",
+    },
+    "cold": {
+        "bg": "#EAF1F7",
+        "surface": "#FFFFFF",
+        "surface_alt": "#E1EBF4",
+        "border": "#C5D4E1",
+        "text": "#0F1E2A",
+        "text_muted": "#4D6070",
+        "text_disabled": "#9AABB9",
+        "primary": "#336288",
+        "primary_hover": "#3F74A0",
+        "on_primary_hover": "#FFFFFF",
         "on_primary": "#FFFFFF",
-        "secondary": "#3C5740",
-        "secondary_hover": "#49694E",
-        "on_secondary_hover": "#F3F6EB",
-        "on_secondary": "#F3F6EB",
-        "accent": "#98A88E",  # Soft sage accent
-        "on_accent": "#141D14",
-        "attention": "#D6A85B",  # Warm earthy gold
-        "danger": "#D16A65",  # Soft coral red
-        "board_light": "#E9EFE4",  # Soft pastel matcha paper
-        "board_dark": "#7B9675",  # Earthy green board tone
-        "board_select": "#66A374",
-        "board_last": "#D6A85B",
-        "board_hint": "#2A402D",
-    }
+        "secondary": "#D4E6F4",
+        "secondary_hover": "#C2DBEF",
+        "on_secondary_hover": "#0E334A",
+        "on_secondary": "#0E334A",
+        "accent": "#1B3D59",
+        "on_accent": "#E5EDFA",
+        "attention": "#7A5C00",
+        "danger": "#BA1A1A",
+        "board_light": "#E4F0F8",
+        "board_dark": "#6A97C0",
+        "board_select": "#336288",
+        "board_last": "#9ECBF7",
+        "board_hint": "#0A151B",
+        "rim": "#FFFFFF",
+        "glow": "#336288",
+    },
+    "dark_cold": {
+        "bg": "#0B0C10",  # Ink Shadow
+        "surface": "#15161F",
+        "surface_alt": "#1F2132",
+        "border": "#30334A",
+        "text": "#E6E0EE",
+        "text_muted": "#A89EB4",
+        "text_disabled": "#575468",
+        "primary": "#B9B3F0",
+        "primary_hover": "#CCC7F6",
+        "on_primary_hover": "#1E1A4A",
+        "on_primary": "#1E1A4A",
+        "secondary": "#2F3559",  # Indigo Night
+        "secondary_hover": "#3B4270",
+        "on_secondary_hover": "#EEE9F4",
+        "on_secondary": "#DCD5E5",
+        "accent": "#7A7AB8",  # Violet Mist
+        "on_accent": "#0B0C14",
+        "attention": "#E8D7A8",
+        "danger": "#FFB4AB",
+        "board_light": "#DCD5E5",  # Pale Lilac
+        "board_dark": "#6C6CA8",
+        "board_select": "#B9B3F0",
+        "board_last": "#B7A8BD",
+        "board_hint": "#0B0C10",
+    },
+    "fall": {
+        "bg": "#1C0F0D",  # Tobi Brown night
+        "surface": "#261613",
+        "surface_alt": "#331E1A",
+        "border": "#4A2C26",
+        "text": "#FBE9D7",
+        "text_muted": "#C9A493",
+        "text_disabled": "#6E4E45",
+        "primary": "#F78358",  # Bonfire
+        "primary_hover": "#F99A75",
+        "on_primary_hover": "#2A0F07",
+        "on_primary": "#2A0F07",
+        "secondary": "#482420",  # Tobi Brown
+        "secondary_hover": "#5A2E28",
+        "on_secondary_hover": "#FFF6D6",
+        "on_secondary": "#FFEEB0",
+        "accent": "#F59C6A",  # Copper River
+        "on_accent": "#2A0F07",
+        "attention": "#FEBF7C",  # Peach
+        "danger": "#FF8A80",
+        "board_light": "#FFEEB0",  # Buttermilk
+        "board_dark": "#B24D37",  # Apple Blossom
+        "board_select": "#FEBF7C",
+        "board_last": "#F59C6A",
+        "board_hint": "#1C0F0D",
+    },
+    "periwinkle": {
+        "bg": "#11162A",
+        "surface": "#181F38",
+        "surface_alt": "#222B4A",
+        "border": "#33406A",
+        "text": "#E5EDFA",  # First Snow
+        "text_muted": "#A2B0CF",
+        "text_disabled": "#55608A",
+        "primary": "#A2B7E4",  # Gladeye
+        "primary_hover": "#BBD0ED",
+        "on_primary_hover": "#13204A",
+        "on_primary": "#13204A",
+        "secondary": "#2E3E6D",  # Mystification
+        "secondary_hover": "#3A4C80",
+        "on_secondary_hover": "#FFFFFF",
+        "on_secondary": "#E5EDFA",
+        "accent": "#7087BB",  # Orbital
+        "on_accent": "#0B1230",
+        "attention": "#F3E3B0",
+        "danger": "#FFB4AB",
+        "board_light": "#E5EDFA",
+        "board_dark": "#7087BB",
+        "board_select": "#A2B7E4",
+        "board_last": "#BBD0ED",
+        "board_hint": "#11162A",
+    },
+    "summer": {
+        "bg": "#F6F1EC",  # Lace Veil, warmed
+        "surface": "#FFFFFF",
+        "surface_alt": "#F3E6DC",
+        "border": "#E2CDBE",
+        "text": "#3A2216",
+        "text_muted": "#7A5442",
+        "text_disabled": "#BFA595",
+        "primary": "#9C5C34",  # Indochine
+        "primary_hover": "#B06A3E",
+        "on_primary_hover": "#FFFFFF",
+        "on_primary": "#FFFFFF",
+        "secondary": "#EECEB9",  # Desert Field
+        "secondary_hover": "#E8BFA4",
+        "on_secondary_hover": "#4A2A18",
+        "on_secondary": "#4A2A18",
+        "accent": "#D08F6B",  # Cinnamon Brandy
+        "on_accent": "#2A1408",
+        "attention": "#8A5A00",
+        "danger": "#BA1A1A",
+        "board_light": "#F6E6DA",
+        "board_dark": "#D08F6B",
+        "board_select": "#9C5C34",
+        "board_last": "#E5B194",  # Hush Puppy
+        "board_hint": "#3A2216",
+        "rim": "#FFFFFF",
+        "glow": "#9C5C34",
+    },
+    "winter": {
+        "bg": "#EEEBE7",  # Almond haze
+        "surface": "#FBFAF8",
+        "surface_alt": "#E6E0DD",
+        "border": "#D3CAC6",
+        "text": "#23253A",
+        "text_muted": "#5E5A6E",
+        "text_disabled": "#ABA4AE",
+        "primary": "#4D516D",  # Twilight Navy
+        "primary_hover": "#5D6282",
+        "on_primary_hover": "#FFFFFF",
+        "on_primary": "#FFFFFF",
+        "secondary": "#DCCCC8",
+        "secondary_hover": "#D3BCB6",  # Almond Blush
+        "on_secondary_hover": "#3A2F3A",
+        "on_secondary": "#3A2F3A",
+        "accent": "#A8868C",  # Dusty Rose
+        "on_accent": "#1A1420",
+        "attention": "#7A5600",
+        "danger": "#BA1A1A",
+        "board_light": "#EFE6E2",
+        "board_dark": "#A8868C",
+        "board_select": "#4D516D",
+        "board_last": "#B5A4B4",  # Lavender Mist
+        "board_hint": "#23253A",
+        "rim": "#FFFFFF",
+        "glow": "#4D516D",
+    },
+}
 
-    # Ensuring algorithm safety and accessibility remains intact
-    roles["board_light"], roles["board_dark"] = _muted_board_tones(
-        roles["board_light"], roles["board_dark"]
-    )
+
+def _handpicked(theme_id: str) -> Theme:
+    """Build a curated theme, keeping its board overlays and danger color legible."""
+    roles = dict(_HANDPICKED_ROLES[theme_id])
     squares = (roles["board_light"], roles["board_dark"])
     for key in ("board_select", "board_last", "board_hint"):
         roles[key] = _visible_on_board(roles[key], squares)
     roles["danger"], roles["on_danger"] = _accessible_fill(roles["danger"])
-    return Theme("dark_winter", *NAMES["dark_winter"], colors, roles)
+    return Theme(theme_id, *NAMES[theme_id], PALETTES[theme_id], _with_frost_roles(roles))
+
+
+def _with_frost_roles(roles: dict[str, str]) -> dict[str, str]:
+    """Add the glass rim and glow roles shared by every theme."""
+    roles.setdefault("rim", _mix(roles["border"], roles["text"], 0.22))
+    roles.setdefault("glow", roles["primary"])
+    return roles
 
 
 def load_themes(theme_dir: Path | None = None) -> dict[str, Theme]:
     """Build built-in themes and discover Color Hunt palettes from filenames."""
     themes = {
         theme_id: (
-            _handpicked_dark_winter()
-            if theme_id == "dark_winter"
+            _handpicked(theme_id)
+            if theme_id in _HANDPICKED_ROLES
             else derive_theme(
                 list(colors),
                 theme_id=theme_id,
@@ -482,6 +635,12 @@ def load_themes(theme_dir: Path | None = None) -> dict[str, Theme]:
 
 THEMES = load_themes()
 THEME_IDS = tuple(THEMES)
+
+
+def side_colors(theme: Theme) -> tuple[str, str]:
+    """Return the swatch colors that stand for White and Black on this theme."""
+    roles = theme.roles
+    return roles["board_light"], roles["bg"] if theme.is_dark else roles["text"]
 
 
 def get_theme(theme_id: str) -> Theme:
