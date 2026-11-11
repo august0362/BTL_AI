@@ -4,7 +4,7 @@
 
 **Người vs Bot**, **Bot vs Bot**, **Xếp hạng AI**, **Lịch sử**, **Xếp hạng**, **Cài đặt**, **Thoát**.
 
-Danh sách bot gồm 4 bot thành viên và các bot benchmark (B1–B7 mặc định, 19 bot; B8 hiện khi đặt `[benchmarks] max_level = 8` trong `backend/config/default.toml`). Bot màu xám chưa khởi tạo được; dòng bên dưới nêu lý do (chưa triển khai, thiếu trọng số…).
+Danh sách bot gồm 4 bot thành viên và các bot benchmark B1–B4 (mặc định `[benchmarks] max_level = 4`; tăng lên 5…9 để hiện thêm B5…B9). Bot màu xám chưa khởi tạo được; dòng bên dưới nêu lý do (chưa triển khai, thiếu trọng số…).
 
 ## Người vs Bot
 

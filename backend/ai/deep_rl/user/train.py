@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import random
 import sys
 import time
 from collections import deque
@@ -147,6 +148,9 @@ class TrainConfig:
     batch_schedule: str = ""
     tactic_puzzles: str = ""
     mate_level_schedule: str = ""
+    anchor_weight: float = 0.0
+    anchor_pgn: int = 0
+    bench_train_depth: int = 2
 
 
 @dataclass
@@ -166,6 +170,8 @@ class _Game:
     pending: list[tuple] | None = None
     transitions: list[tuple] | None = None
     regular: bool = False  # puzzle ôn trong phần ván thường: tính là ván thường
+    # Ván đấu với B1.5 khi train: màu do B1.5 cầm (None = mạng chơi cả hai bên)
+    opponent_color: chess.Color | None = None
 
 
 def _new_game(
@@ -336,6 +342,7 @@ def _sample_batches(
     puzzle_fraction: float = 0.0,
     tactic_buffer: ReplayBuffer | None = None,
     tactic_fraction: float = 0.0,
+    anchor_pgn: bool = False,
 ) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray] | None]:
     """Lấy batch theo tỉ lệ chuyên gia (PGN), lời giải puzzle, chiếu hết và replay chính.
 
@@ -351,9 +358,13 @@ def _sample_batches(
     expert_batch = (
         expert_buffer.sample(expert_count, rng) if expert_count and expert_buffer else None
     )
+    if expert_batch is not None:
+        # cột ``anchor``: hàng nào được neo CE (lời giải puzzle luôn; kỳ thủ khi ``anchor_pgn``)
+        expert_batch["anchor"] = np.full(len(expert_batch["actions"]), anchor_pgn, dtype=np.bool_)
     for extra_buffer, extra_count in ((puzzle_buffer, puzzle_count), (tactic_buffer, tactic_count)):
         if extra_count:
             extra = extra_buffer.sample(extra_count, rng)
+            extra["anchor"] = np.ones(len(extra["actions"]), dtype=np.bool_)
             expert_batch = extra if expert_batch is None else _concat_batches(expert_batch, extra)
     return batch, expert_batch
 
@@ -487,6 +498,7 @@ def train(config: TrainConfig) -> Path:
         margin=config.margin,
         margin_weight=config.margin_weight,
         double_dqn=config.double_dqn,
+        anchor_weight=config.anchor_weight,
     )
     games_done = _load_checkpoint(agent, config.resume) if config.resume else 0
     regular_games_done = games_done
@@ -612,6 +624,7 @@ def train(config: TrainConfig) -> Path:
     q_means: list[float] = []
     td_losses: list[float] = []
     margin_losses: list[float] = []
+    anchor_losses: list[float] = []
     results = {"1-0": 0, "0-1": 0, "1/2-1/2": 0, "*": 0}
     plies_total = 0
     decisive_mates = 0
@@ -624,6 +637,9 @@ def train(config: TrainConfig) -> Path:
     mate_summary_printed = False
     last_regular_phase: str | None = None
     mixed_mate_results: deque[bool] = deque(maxlen=config.mate_window)
+    bench_opponent = MaterialAlphaBetaOpponent(config.bench_train_depth)
+    bench_rng = random.Random(config.seed)
+    bench_results = {"win": 0, "draw": 0, "loss": 0}
     next_bench_progress = 0.2
     final_bench_done = False
     next_snapshot = (
@@ -676,6 +692,14 @@ def train(config: TrainConfig) -> Path:
                             mate_puzzles[level], level, rng, game_index=regular_games_started
                         )
                         slots[slot].regular = True
+                    elif kind == "bench":
+                        # Đấu với B1.5: mạng cầm một màu, B1.5 cầm màu kia; học cả nước hai bên
+                        slots[slot] = _new_game(
+                            False, None, config.max_plies, game_index=regular_games_started
+                        )
+                        slots[slot].opponent_color = (
+                            chess.WHITE if rng.integers(2) == 0 else chess.BLACK
+                        )
                     elif kind == "tactic":
                         fen, solution = tactic_puzzles[int(rng.integers(len(tactic_puzzles)))]
                         slots[slot] = _new_game(
@@ -716,6 +740,11 @@ def train(config: TrainConfig) -> Path:
             for slot in active
             if slots[slot].random_moves
         }
+        for slot in active:
+            game = slots[slot]
+            if game.opponent_color is not None and game.board.turn == game.opponent_color:
+                move = bench_opponent.select_move(game.board, bench_rng)
+                chosen[slot] = game.moves.index(move)
         learned = [slot for slot in active if slot not in chosen]
         if learned:
             by_temperature: dict[float, list[int]] = {}
@@ -773,6 +802,17 @@ def train(config: TrainConfig) -> Path:
                         mixed_mate_results.append(_mate_success(game))
                     regular_games_done += 1
                 results[result] += 1
+                if game.opponent_color is not None:
+                    winner = game.board.outcome(claim_draw=True)
+                    winner = winner.winner if winner is not None else None
+                    key = (
+                        "draw"
+                        if winner is None
+                        else "loss"
+                        if winner == game.opponent_color
+                        else "win"
+                    )
+                    bench_results[key] += 1
                 plies_total += game.board.ply() - game.starting_ply
                 if game.board.is_checkmate():
                     decisive_mates += 1
@@ -801,6 +841,7 @@ def train(config: TrainConfig) -> Path:
                 fractions["mate"],
                 tactic_buffer,
                 fractions["tactic"],
+                bool(config.anchor_pgn),
             )
             stats = agent.update(batch, expert_batch)
             updates += 1
@@ -814,6 +855,7 @@ def train(config: TrainConfig) -> Path:
             q_means.append(stats["q_mean"])
             td_losses.append(stats["td_loss"])
             margin_losses.append(stats["margin_loss"])
+            anchor_losses.append(stats["anchor_loss"])
 
         timed_out = time.time() >= deadline
         if (
@@ -891,11 +933,15 @@ def train(config: TrainConfig) -> Path:
                 "loss": float(np.mean(losses)) if losses else math.nan,
                 "td_loss": float(np.mean(td_losses)) if td_losses else math.nan,
                 "margin_loss": float(np.mean(margin_losses)) if margin_losses else math.nan,
+                "anchor_loss": float(np.mean(anchor_losses)) if anchor_losses else math.nan,
                 "q_mean": float(np.mean(q_means)) if q_means else math.nan,
                 "win_rate": vs_random.wins / config.eval_games,
                 "win_rate_greedy": vs_greedy.wins / config.eval_games,
                 "score": score,
                 "bench_score": _score(vs_bench) if vs_bench is not None else math.nan,
+                "train_bench_wins": bench_results["win"],
+                "train_bench_draws": bench_results["draw"],
+                "train_bench_losses": bench_results["loss"],
                 "tactics": tactics_hit,
                 "gm_match": gm_hit,
                 "expert_fraction": _batch_fractions(
@@ -970,7 +1016,14 @@ def train(config: TrainConfig) -> Path:
                 f"  | random: {vs_random.wins}/{vs_random.draws}/{vs_random.losses}"
                 f"  greedy: {vs_greedy.wins}/{vs_greedy.draws}/{vs_greedy.losses}"
                 f"  score: {score:.3f}  tac: {_num(tactics_hit, '.0%')}"
-                f"  gm: {_num(gm_hit, '.0%')}\n",
+                f"  gm: {_num(gm_hit, '.0%')}"
+                + (
+                    f"  b1.5: {bench_results['win']}/{bench_results['draw']}"
+                    f"/{bench_results['loss']}"
+                    if sum(bench_results.values())
+                    else ""
+                )
+                + "\n",
                 flush=True,
             )
             if vs_bench is not None:
@@ -1010,7 +1063,9 @@ def train(config: TrainConfig) -> Path:
             q_means.clear()
             td_losses.clear()
             margin_losses.clear()
+            anchor_losses.clear()
             results = dict.fromkeys(results, 0)
+            bench_results = dict.fromkeys(bench_results, 0)
             plies_total = 0
             decisive_mates = 0
             _save_checkpoint(agent, regular_games_done, out / "checkpoint.pt")

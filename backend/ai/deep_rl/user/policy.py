@@ -66,17 +66,51 @@ def load_policy(
     device: str = "cpu",
     depth: int = 1,
     max_think_time_s: float = 0.0,
+    simulations: int = 64,
+    search: str = "mcts",
+    end_g: int = 4,
+    ramp_moves: int = 10,
+    batch_size: int = 32,
+    tree_reuse: int = 0,
+    widening: bool = False,
+    early_stop: bool = False,
 ) -> Policy:
     """Nạp trọng số; chưa có trọng số thì báo ``NotImplementedError`` để bot đi ngẫu nhiên.
 
-    ``depth = 1``: chọn argmax Q. ``depth >= 2``: alpha-beta độ sâu ``depth`` trong tối đa
-    ``max_think_time_s`` giây mỗi nước (0 = không giới hạn).
+    File DQN: ``depth = 1`` chọn argmax Q; ``depth >= 2`` alpha-beta độ sâu ``depth`` trong tối
+    đa ``max_think_time_s`` giây mỗi nước (0 = không giới hạn). File V11 (policy-value):
+    MCTS ``simulations`` lượt mỗi nước, cũng giới hạn bởi ``max_think_time_s``. File V20:
+    ba mạng START/MID/END theo pha; ``search = "mcts"`` chạy MCTS ``simulations`` lượt,
+    ``"alphabeta"`` chạy alpha-beta độ sâu ``depth`` với điểm lá là Value của mạng (§7.1).
+    ``"ramp"`` chạy MCTS: mạng MID khi G > ``end_g``, sau đó xác suất dùng mạng END tăng
+    ``1/ramp_moves`` mỗi nước của mình, gom ``batch_size`` lá mỗi lượt gọi mạng, chạy tối đa
+    ``simulations`` lượt mới mỗi nước, giữ lại cây tối đa ``tree_reuse`` ply, tùy chọn
+    ``widening`` (progressive widening) và ``early_stop``. File DQN/V11 bỏ qua ``search``.
     """
     if weights_path is None:
         raise NotImplementedError("deep_rl chưa có trọng số (weights_url trống)")
     from ai.deep_rl.user.model import Model
+    from ai.deep_rl.v11.policy import V11_FORMAT, load_v11_policy
+    from ai.deep_rl.v20.policy import V20_FORMAT, load_v20_policy
 
     data = load_file(weights_path, device)
+    if data.get("format") == V11_FORMAT:
+        return load_v11_policy(data, device, simulations, max_think_time_s)
+    if data.get("format") == V20_FORMAT:
+        return load_v20_policy(
+            data,
+            device,
+            simulations,
+            search,
+            depth,
+            max_think_time_s,
+            end_g,
+            ramp_moves,
+            batch_size,
+            tree_reuse,
+            widening,
+            early_stop,
+        )
     if data.get("format") != WEIGHTS_FORMAT:
         raise ValueError(f"file trọng số không đúng định dạng {WEIGHTS_FORMAT}")
     model = Model(**data["config"]).to(device)

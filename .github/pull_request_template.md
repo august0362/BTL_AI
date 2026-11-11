@@ -1,5 +1,5 @@
 ## Mô tả
-<!-- PR này làm gì? Liên quan task nào trong documents/TASKS.md (vd X1-02)? -->
+<!-- PR này làm gì và vì sao? -->
 
 ## Module bị ảnh hưởng
 - [ ] `backend/core/`  - [ ] `backend/ai/base_bot.py` / `backend/ai/registry.py`  - [ ] `backend/ai/<bot của tôi>/`
@@ -11,7 +11,7 @@
 <!-- tên, phiên bản, lý do -->
 
 ## Kiểm tra trước khi gửi
-- [] `pytest` xanh trên máy
+- [ ] `pytest` xanh trên máy
 - [ ] `ruff check .` và `ruff format --check .` không lỗi
 - [ ] `lint-imports` không lỗi
 - [ ] Branch đã cập nhật với `main` mới nhất

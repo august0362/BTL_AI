@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-GAME_KINDS = ("mate", "tactic", "endgame", "middlegame", "full", "full150")
+GAME_KINDS = ("mate", "tactic", "endgame", "middlegame", "full", "full150", "bench")
 BATCH_KINDS = ("pgn", "mate", "tactic", "decisive")
 LEVEL_KINDS = ("L1", "L2", "L3", "L4")
 

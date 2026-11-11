@@ -30,7 +30,7 @@ flowchart LR
 
 - Thử bot: `chess.Board()` tạo thế bắt đầu, `chess.Board(fen)` tạo từ FEN, rồi `move = bot.select_move(board)`. Khi chơi thật, hệ thống truyền `board: chess.Board` hiện tại (quân, bên tới lượt, nhập thành, bắt tốt qua đường…); luật cờ do `python-chess` xử lý.
 - Trả nước trong `board.legal_moves`, **không sửa** `board` được truyền (thử nước trên `board.copy()`). Hai instance cùng loại độc lập. Kế thừa `BaseBot`, khai báo `bot_id`, `display_name`, cài `select_move`; `last_search_info` tùy chọn.
-- Deep RL: `encode_board(board)` (`backend/ai/deep_rl/encoding.py`) → `numpy.float32` `(18, 8, 8)`; `legal_action_mask(board)` → mặt nạ 4096 hành động. `DeepRLBot` nối giải đấu với `deep_rl/user/policy.py`; phần tự triển khai của Option 4 ở `deep_rl/user/` (`model.py`, `agent.py`, `replay.py`, `train.py`, `policy.py`).
+- Deep RL: `DeepRLBot` nạp file trọng số qua `deep_rl/user/policy.py::load_policy`, chơi theo định dạng file (DQN `user/`, V11.2 `v11/`, V20 `v20/`); xem [Deep RL README](../backend/ai/deep_rl/README.md).
 - Thêm bot mới hoặc đổi ID/module/class thì cập nhật `BOT_REGISTRY` (sửa thuật toán thì không). Giữ import nhẹ; không khởi tạo được thì raise `BotUnavailableError`.
 
 ## Từ clone đến Pull Request
@@ -92,4 +92,4 @@ Không commit `database/data/`, `another/local_tools/`, `backend/config/local.to
 
 ## Tài liệu khác
 
-[CONTEXT.md](CONTEXT.md) (kiến trúc, hợp đồng) · [TASKS.md](TASKS.md) (tiến độ) · [USER_GUIDE.md](USER_GUIDE.md) (cách chơi) · [DEEP_RL_DESIGN.md](DEEP_RL_DESIGN.md), [RL_LEARNING_GUIDE.md](RL_LEARNING_GUIDE.md) (Option 4).
+[CONTEXT.md](CONTEXT.md) (kiến trúc, hợp đồng) · [USER_GUIDE.md](USER_GUIDE.md) (cách chơi) · [BENCH9.md](BENCH9.md) (Benchmark 9) · [Deep RL](../backend/ai/deep_rl/README.md) (Option 4).

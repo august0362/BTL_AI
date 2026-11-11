@@ -90,7 +90,7 @@ class BenchmarkMaterialBot(_SearchBenchmarkBot):
     """Benchmark 1.5: plain alpha-beta, score = own material minus the opponent's."""
 
     bot_id = "bench_alphabeta_material"
-    display_name = "Benchmark 1.5 - Alpha-Beta Material"
+    display_name = "Benchmark 1.5 - Alpha-Beta + (M)"
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
@@ -106,7 +106,7 @@ class BenchmarkAlphaBetaBot(_SearchBenchmarkBot):
     """Benchmark 2: fixed-depth alpha-beta with material plus piece-square tables."""
 
     bot_id = "bench_alphabeta3"
-    display_name = "Benchmark 2 - Alpha-Beta 3"
+    display_name = "Benchmark 2 - Alpha-Beta + (M & PST)"
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
