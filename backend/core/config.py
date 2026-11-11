@@ -1,5 +1,6 @@
 """Load, merge, and save the project's TOML configuration."""
 
+import json
 import tomllib
 from copy import deepcopy
 from pathlib import Path
@@ -16,14 +17,24 @@ def load_config(
     default_path: str | Path = DEFAULT_CONFIG_PATH,
     local_path: str | Path | None = LOCAL_CONFIG_PATH,
 ) -> dict[str, Any]:
-    """Load defaults and apply local TOML overrides when present."""
+    """Load defaults, then the model manifest written by run.bat, then local TOML overrides."""
     with Path(default_path).open("rb") as default_file:
         defaults = tomllib.load(default_file)
+    defaults = deep_merge(defaults, _models_config(Path(default_path).with_name("models.json")))
     if local_path is None or not Path(local_path).is_file():
         return defaults
     with Path(local_path).open("rb") as local_file:
         local = tomllib.load(local_file)
     return deep_merge(defaults, local)
+
+
+def _models_config(path: Path) -> dict[str, Any]:
+    """Return the ``config`` table of the applied model manifest, or an empty mapping."""
+    try:
+        config = json.loads(path.read_text(encoding="utf-8")).get("config", {})
+    except (OSError, ValueError, AttributeError):
+        return {}
+    return config if isinstance(config, dict) else {}
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

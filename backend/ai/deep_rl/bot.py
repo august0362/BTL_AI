@@ -31,6 +31,14 @@ class DeepRLBot(RandomBaselineBot):
                 device=settings.get("device", "cpu"),
                 depth=int(settings.get("depth", 3)),
                 max_think_time_s=float(settings.get("max_think_time_s", 1.0)),
+                simulations=int(settings.get("simulations", 64)),
+                search=str(settings.get("search", "mcts")),
+                end_g=int(settings.get("end_g", 4)),
+                ramp_moves=int(settings.get("ramp_moves", 10)),
+                batch_size=int(settings.get("batch_size", 32)),
+                tree_reuse=int(settings.get("tree_reuse", 0)),
+                widening=bool(settings.get("widening", False)),
+                early_stop=bool(settings.get("early_stop", False)),
             )
         except NotImplementedError:
             self.is_baseline = True

@@ -144,11 +144,8 @@ class App:
         return get_bot_config(self.config, bot_id)
 
     def _localized_bot_name(self, bot_id: str) -> str:
-        """Return a localized bot name with its baseline marker when applicable."""
-        name = self._translator.t(f"players.{bot_id}")
-        if bot_id in self._baseline_bot_ids and bot_id != "baseline":
-            name += f" {self._translator.t('players.baseline_suffix')}"
-        return name
+        """Return a localized bot name (no "(baseline)" marker)."""
+        return self._translator.t(f"players.{bot_id}")
 
     def run(self) -> None:
         """Run the event loop until the window closes."""

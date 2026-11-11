@@ -80,6 +80,7 @@ class Agent:
         margin: float = 0.05,
         margin_weight: float = 1.0,
         double_dqn: int = 0,
+        anchor_weight: float = 0.0,
     ) -> None:
         self.device = torch.device(device)
         self.online = model.to(self.device)
@@ -92,6 +93,8 @@ class Agent:
         self.margin = margin
         self.margin_weight = margin_weight
         self.double_dqn = bool(double_dqn)
+        # Neo CE: giữ nước đáp án (mẫu có cột ``anchor``) đứng đầu, hệ số nhỏ bên cạnh TD
+        self.anchor_weight = anchor_weight
         self.optimizer = torch.optim.Adam(self.online.parameters(), lr=lr)
 
     @torch.no_grad()
@@ -139,7 +142,14 @@ class Agent:
         if expert_batch is not None:
             actions_np = np.concatenate((actions_np, expert_batch["actions"]))
         actions = torch.as_tensor(actions_np, device=device)
-        q_all = self.online(states)
+        use_anchor = (
+            self.anchor_weight > 0
+            and expert_batch is not None
+            and "anchor" in expert_batch
+            and bool(np.any(expert_batch["anchor"]))
+        )
+        logits_all = self.online.logits(states) if use_anchor else None
+        q_all = torch.tanh(logits_all) if use_anchor else self.online(states)
         q_taken = q_all.gather(1, actions[:, None]).squeeze(1)
         batch_count = len(batch["actions"])
         rewards = torch.as_tensor(batch["rewards"], device=device)
@@ -184,7 +194,14 @@ class Agent:
             masks = torch.as_tensor(expert_batch["masks"], device=device)
             expert_actions = torch.as_tensor(expert_batch["actions"], device=device)
             expert_loss = margin_loss(q_all[batch_count:], masks, expert_actions, self.margin)
-        loss = td_loss + self.margin_weight * expert_loss
+        anchor_loss = torch.zeros((), device=device)
+        if use_anchor:
+            rows = torch.as_tensor(expert_batch["anchor"], device=device, dtype=torch.bool)
+            anchor_masks = torch.as_tensor(expert_batch["masks"], device=device)[rows]
+            anchor_logits = logits_all[batch_count:][rows].masked_fill(~anchor_masks, MASK_VALUE)
+            anchor_actions = torch.as_tensor(expert_batch["actions"], device=device)[rows]
+            anchor_loss = functional.cross_entropy(anchor_logits, anchor_actions)
+        loss = td_loss + self.margin_weight * expert_loss + self.anchor_weight * anchor_loss
 
         self.optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -195,6 +212,7 @@ class Agent:
             "loss": float(loss.item()),
             "td_loss": float(td_loss.item()),
             "margin_loss": float(expert_loss.item()),
+            "anchor_loss": float(anchor_loss.item()),
             "q_mean": float(q_taken.mean().item()),
         }
 

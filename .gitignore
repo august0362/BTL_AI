@@ -82,3 +82,8 @@ backend/ai/benchmarks_extension/bench9/engine/
 another/tools/bench9_strength.py
 
 AGENTS.md
+.png
+# run.bat: Python portable, manifest model đã áp dụng, file tải dở
+.runtime/
+backend/config/models.json
+*.download

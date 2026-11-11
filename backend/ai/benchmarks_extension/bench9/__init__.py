@@ -2,5 +2,5 @@
 
 B9 is engine-derived, not original work: search and NNUE evaluation are Stockfish's
 (GPLv3, https://github.com/official-stockfish/Stockfish). This package only holds the
-adapter, the pinned release data and the installer. See documents/bench9/.
+adapter, the pinned release data and the installer. See documents/BENCH9.md.
 """

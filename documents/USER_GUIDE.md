@@ -4,7 +4,7 @@
 
 **Người vs Bot**, **Bot vs Bot**, **Xếp hạng AI**, **Lịch sử**, **Xếp hạng**, **Cài đặt**, **Thoát**.
 
-Danh sách bot gồm 4 bot thành viên và các bot benchmark (B1–B7 mặc định, 19 bot; B8 hiện khi đặt `[benchmarks] max_level = 8` trong `backend/config/default.toml`). Bot màu xám chưa khởi tạo được; dòng bên dưới nêu lý do (chưa triển khai, thiếu trọng số…).
+Danh sách bot gồm 4 bot thành viên và các bot benchmark B1–B4 (mặc định `[benchmarks] max_level = 4`; tăng lên 5…9 để hiện thêm B5…B9). Bot màu xám chưa khởi tạo được; dòng bên dưới nêu lý do (chưa triển khai, thiếu trọng số…).
 
 ## Người vs Bot
 
@@ -57,7 +57,7 @@ Thứ hạng, số ván, thắng, hòa, thua, điểm và Elo của người ch�
 - **Cài PyTorch chậm:** lần đầu mất vài phút; để `run.bat` chạy xong, kiểm tra mạng.
 - **Bot bị làm mờ:** bot không khởi tạo được — đọc lý do dưới tên bot (chưa triển khai, thiếu trọng số).
 - **Cửa sổ mờ (Windows):** cập nhật Python/Pygame, khởi động lại game (app đã bật DPI awareness); vẫn mờ thì kiểm tra tùy chọn tương thích DPI của Windows cho Python.
-- **Không tìm thấy Python:** cài Python 3.13 kèm Python Launcher (`py`), chạy lại `run.bat` từ thư mục dự án.
+- **Không tìm thấy Python:** `run.bat` tự tải Python 3.13 portable vào `.runtime\`; chỉ cần có mạng rồi chạy lại.
 
 ## Ảnh minh họa
 

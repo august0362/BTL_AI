@@ -1,6 +1,6 @@
 # CONTEXT — Chess AI Tournament
 
-> Tài liệu kiến trúc gốc. Mọi thành viên đọc trước khi code. Đổi hợp đồng giao diện (§4) phải qua PR có approve của `@august0362` và ghi `CHANGELOG.md`.
+> Tài liệu kiến trúc gốc. Mọi thành viên đọc trước khi code. Đổi hợp đồng giao diện (§4) phải qua PR có approve của `@august0362` và cập nhật tài liệu này.
 > Phiên bản tài liệu: **0.3.0** — cập nhật 2026-10-03 (nội dung bổ sung đến 2026-10-08).
 
 ---
@@ -14,7 +14,7 @@ Hệ thống thi đấu cờ vua giữa 4 AI độc lập và người chơi. Lu
 | 1 | Alpha-Beta + Linear Regression | `backend/ai/alphabeta_regression/` |
 | 2 | Alpha-Beta + Genetic Algorithm | `backend/ai/genetic_alphabeta/` |
 | 3 | Pure MCTS | `backend/ai/mcts/` |
-| 4 | Deep Reinforcement Learning (DQN, PyTorch) | `backend/ai/deep_rl/` |
+| 4 | Deep RL: 3 mạng Policy–Value theo pha + MCTS (PyTorch; v1–v10 là DQN) | `backend/ai/deep_rl/` |
 
 ## 2. Thành viên & vai trò
 
@@ -65,7 +65,7 @@ BTL_AI/
 ├── frontend/gui/      # ứng dụng Pygame: màn hình, widget, locales, assets
 ├── frontend/resource/ # bảng màu, tài nguyên giao diện
 ├── database/data/     # lịch sử, xếp hạng tạo khi chơi (.gitignore)
-├── documents/         # CONTEXT, hướng dẫn, kế hoạch, prompt
+├── documents/         # CONTEXT, CONTRIBUTING, USER_GUIDE, BENCH9
 ├── environments/      # .python-version, requirements.txt, requirements-dev.txt
 ├── another/           # local_tools/ (.gitignore), scripts/ (Windows), tests/, tools/
 ├── .github/           # workflow, CODEOWNERS, mẫu PR
@@ -132,7 +132,7 @@ Lớp chính mỗi bot ở `backend/ai/<bot>/bot.py`.
 - Lớp chung `backend/ai/baseline.py::RandomBaselineBot(BaseBot)`, `is_baseline = True`, `random.Random(config.get("seed"))` riêng. Đặt ở `backend/ai/` nên các bot được import.
 - Khung `bot.py` của 3 bot thành viên kế thừa nó; viết bot thật thì thay toàn bộ lớp, `is_baseline` về `False`.
 - `DeepRLBot`: nếu `user.policy.load_policy` còn raise `NotImplementedError` thì chạy baseline (không raise `BotUnavailableError`); lỗi thật (thiếu trọng số, sai sha256…) vẫn raise.
-- GUI thêm hậu tố `t("players.baseline_suffix")` ("(baseline)") ở màn chuẩn bị, panel, lịch sử, xếp hạng.
+- GUI không còn thêm hậu tố "(baseline)" sau tên bot (bỏ 2026-11-03; khóa `players.baseline_suffix` vẫn giữ trong locale).
 - Khi bot thật thay baseline, nên **Đặt lại** bảng xếp hạng (Elo cũ là của bản ngẫu nhiên).
 
 ### 4.3 `backend/core/` — GameState & kiểu dữ liệu
@@ -320,8 +320,8 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 | id | Tên | Cách chơi |
 |---|---|---|
 | `bench_random` | B1 · Random | Chọn đều ngẫu nhiên nước hợp lệ (`seed`) |
-| `bench_alphabeta_material` | B1.5 · Alpha-Beta thuần | Negamax alpha-beta độ sâu 3, eval `material`, tất định |
-| `bench_alphabeta3` | B2 · Alpha-Beta 3 | Negamax alpha-beta độ sâu cố định (3), eval `pst`, hòa điểm thì chọn ngẫu nhiên theo `seed` |
+| `bench_alphabeta_material` | B1.5 · Alpha-Beta + (M) | Negamax alpha-beta độ sâu 3, eval `material`, tất định |
+| `bench_alphabeta3` | B2 · Alpha-Beta + (M & PST) | Negamax alpha-beta độ sâu cố định (3), eval `pst`, hòa điểm thì chọn ngẫu nhiên theo `seed` |
 | `bench_alphabeta_tt` | B3 · Alpha-Beta TT | B2 + bảng chuyển vị Zobrist, sắp nước (MVV-LVA, phong cấp, killer), quiescence (chỉ ăn quân, ≤ 8 nửa nước) |
 | `bench_alphabeta_custom` | B4 · Alpha-Beta Custom | B3 + check extension (≤ 2), mobility (mã/tượng 4, xe 2, hậu 1 mỗi ô), null-move (R=2) + LMR (nước yên tĩnh thứ 4 trở đi −1 ply) khi độ sâu còn ≥ 2; eval `advanced` = `pst` + tốt (chồng −15, cô lập −15, thông +5..+100) + an toàn vua trước tàn cuộc (thiếu tốt che −15/cột, cột mở quanh vua −20) + cặp tượng +30 + xe cột mở +20 / nửa mở +10 (bitboard, cache theo tốt và vua; đổi qua `evaluator`) |
 | `bench5_gpt` / `_deepseek` | B5 · … | Engine PVS dùng hết thời gian (§4.9.1), profile chỉ lấy từ `chatgpt.txt` / `deepseek.txt` (bản Gemini, Grok đã bỏ 2026-10-11) |
@@ -329,7 +329,7 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 | `bench6_gpt` / `_gemini` / `_deepseek` | B6 · … | Engine PVS chọn lọc (§4.9.2), mỗi bản chỉ theo một file (bản B6) |
 | `bench7` | B7 · Dragon | Tổng hợp 4 thiết kế B6, chọn bằng ablation |
 | `bench8_luna` | B8 · Luna | Lõi Dragon + SEE theo ngưỡng; các phương án khác có công tắc, mặc định tắt (§4.9.3) |
-| `bench_super_alphabeta_nnue` | B9 · Super Alpha-Beta NNUE | **Engine kế thừa:** Stockfish 19 chính thức (GPLv3, NNUE nhúng) qua UCI, 1 luồng, trong trần thời gian (§4.9.5, `documents/bench9/`) |
+| `bench_super_alphabeta_nnue` | B9 · Super Alpha-Beta NNUE | **Engine kế thừa:** Stockfish 19 chính thức (GPLv3, NNUE nhúng) qua UCI, 1 luồng, trong trần thời gian (§4.9.5, `documents/BENCH9.md`) |
 
 **B1–B4** (`backend/ai/benchmarks/`):
 
@@ -399,7 +399,7 @@ Khác B5–B8: **không tự viết engine**, mà chạy Stockfish 19 chính th�
 - Lỗi khởi tạo (thiếu binary, sai kiến trúc, NNUE hỏng — kiểm bằng `go depth 1` lúc khởi động) → `BotUnavailableError`. Lỗi giữa ván → khởi động lại 1 lần, nước đó gắn `fallback`; vẫn hỏng → `RuntimeError` (ván hủy), không bao giờ đi ngẫu nhiên.
 - `threads = 1` (công bằng với bot Python, tất định), `hash_mb = 16`; tùy chọn `engine_path`/`BENCH9_ENGINE_PATH`, `nnue_path`, `syzygy_path`.
 - `tournament.process_player` cộng `bot.external_memory_bytes()` (đỉnh RAM tiến trình Stockfish, ~230–330 MB) vào cột Bộ nhớ rồi gọi `bot.close()`.
-- Kết quả (1 s/nước, khai cuộc 2 nửa nước ghép cặp đổi màu, tối đa 150 nửa nước): xem `documents/bench9/BENCHMARK_RESULTS.md` — B9 thắng 400/400 ván trước B7 và B8 (cận dưới Elo 95 % ≈ +729), mọi ván kết thúc bằng chiếu hết, không ván nào chạm mốc 150. Không huấn luyện NNUE riêng (`documents/bench9/KAGGLE_NNUE.md`).
+- Kết quả (1 s/nước, khai cuộc 2 nửa nước ghép cặp đổi màu, tối đa 150 nửa nước): xem `documents/BENCH9.md` — B9 thắng 400/400 ván trước B7 và B8 (cận dưới Elo 95 % ≈ +729), mọi ván kết thúc bằng chiếu hết, không ván nào chạm mốc 150. Không huấn luyện NNUE riêng.
 
 #### 4.9.4 Giải vòng tròn (`backend/tournament/`)
 
@@ -760,10 +760,39 @@ def get_bot_config(config, bot_id) -> dict: ...      # config["bots"][bot_id] ho
 
 ## 7. Option 4 — Deep RL (`backend/ai/deep_rl/`)
 
-- **PyTorch**, huấn luyện trên **Kaggle** (CPU/GPU), suy luận trên **CPU** trong game. Board encoding nằm **bên trong** package. `import torch` **lười** trong bot.
+- **PyTorch**, huấn luyện trên **Kaggle** (CPU/GPU), suy luận trên **CPU** trong game. Board encoding nằm **bên trong** package. `import torch` **lười** trong bot. Lịch sử v1 → V22: `backend/ai/deep_rl/DEEP_RL_EVOLUTION.md`; cách dùng: `backend/ai/deep_rl/README.md`.
 - Trọng số: checkpoint train ở Kaggle; bản tốt nhất lên **GitHub Release** (tag `deeprl-vX.Y`); lần đầu bot tự tải về `backend/ai/deep_rl/weights/` (gitignored) và kiểm `sha256` — không mạng/sai checksum → `BotUnavailableError`.
 - Elo **không phải** reward (reward do Option 4 tự thiết kế; Elo chỉ để đánh giá).
 - CI thiếu trọng số: test hợp đồng dùng mô hình khởi tạo ngẫu nhiên (`allow_random_init`). Không có torch (vd Android) → registry báo bot không khả dụng.
+- `user/policy.py::load_policy` chọn cách chơi theo trường `format` của file trọng số: `deep_rl_dqn_v1` (v1–v10, `user/`), `v11-policy-value-mcts-2` (V11.2, `v11/`), `v20-phase-experts-1` (V20, `v20/`, §7.1).
+
+### 7.1 Bot V20: ba mạng theo pha + MCTS (`backend/ai/deep_rl/v20/`)
+
+Suy luận đúng như giải đấu Kaggle của V20; mã lõi chép từ bundle Kaggle `v20/`, bỏ phần chỉ dùng khi train (head phụ, tree reuse, thống kê).
+
+- **Mạng** `PolicyValueNet(channels=128, blocks=12, head_channels=64)`: đầu vào 19 plane (góc nhìn bên đi), ra 4.672 logit + Value `tanh` vô hướng (+1 thắng, 0 hòa, −1 thua cho bên đi). Ba mạng cùng kiến trúc: `start`, `mid`, `end`.
+- **Pha vật chất** `G(b) = 4·(số Hậu) + 2·(số Xe) + (số Tượng + số Mã)`, đếm cả hai bên (thế đầu `G = 24`).
+- **Xác suất sang MID** `r(b) = clip((b.ply() − 16)/20 + 0,2·(24 − G(b))/16, 0, 1)`.
+- **Chọn mạng** `select_phase(board, threshold=0.5)`, không giữ trạng thái: duyệt lại lịch sử ván (`board.root()` + `move_stack`), chỉ xét các thế **đến lượt bên đang đi** (gồm thế hiện tại):
+  1. có thế nào `G ≤ 8` → `"end"` (một chiều, phong cấp làm `G` tăng lại vẫn là END);
+  2. ngược lại, `max r ≥ threshold` → `"mid"` (một chiều);
+  3. còn lại → `"start"`.
+  Ngưỡng `threshold` cố định `PHASE_THRESHOLD = 0.5` (trung vị của `u ~ U(0,1)` lúc train; giải Kaggle dùng các ngưỡng 0,15…0,87).
+- **Tìm kiếm** mỗi nước một cây mới, PUCT `c_puct = 1.5`, FPU = Value nút cha − 0,2, không nhiễu Dirichlet, `simulations` lượt (cấu hình; V20 = 96, V20 bản mới = 196), chọn nước nhiều lượt thăm nhất. Một cây chỉ dùng một mạng (mạng của pha ở gốc). Backup negamax: đổi dấu mỗi tầng; thế kết thúc dùng kết quả thật (`rules.outcome`).
+- **Hybrid** (`search = "hybrid"`): pha ở gốc là START/MID thì dùng alpha-beta bên dưới, END thì dùng MCTS `simulations` lượt. Lý do: kiến thức Tablebase của mạng END nằm ở Policy, mà chỉ MCTS đi theo Policy. `last_info["mode"] = "hybrid"`, `last_info["search"]` = cách tìm thật sự được dùng.
+- **Alpha-beta thay MCTS** (`search = "alphabeta"` trong `[bots.<id>]`; mặc định `"mcts"`, giá trị khác ngoài `"hybrid"` → `ValueError`), `v20/alphabeta.py::V20AlphaBetaPolicy`: negamax alpha-beta như DQN v1.0 (`user/search.py::AlphaBetaPolicy`), chỉ đổi hàm đánh giá, để so hai mạng trên cùng một thuật toán.
+  - Một mạng cho cả cây: mạng của pha ở gốc (`select_phase`).
+  - Lá ở đúng `depth` nửa nước tính từ gốc; điểm lá = Value của mạng cho bên đi ở lá. Thế kết thúc chấm chính xác như `AlphaBetaPolicy._terminal` (chiếu hết `−(3,0 − 0,01·ply)`, hòa = 0).
+  - Thứ tự nước: logit Policy giảm dần (từ cùng lần chạy mạng). Nút cách lá 1 nửa nước chạy mạng **một lần theo batch** cho mọi con chưa kết thúc.
+  - Iterative deepening 1 → `depth`; hết `max_think_time_s` thì dùng kết quả của độ sâu đã xong (độ sâu 1 luôn xong); `0` = không giới hạn.
+  - Trong một nước, thế đã chấm thì dùng lại Value (khóa = 19 bitboard đầu vào mạng). Với `device = "cuda"`, mỗi lần chạy mạng phát lại một CUDA Graph đã ghi theo cỡ lô đệm (1, 2, 4, …, 256); kết quả không đổi so với chạy thường.
+  - `last_info`: `mode = "alphabeta"`, `phase`, `depth` (độ sâu đã xong), `nodes` (số thế chạy mạng), `eval` (điểm nước chọn, góc bên đi), `time_s`.
+  - `bot.py` đọc khóa `search` → `load_policy(..., search=...)` → `load_v20_policy(data, device, simulations, search, depth, max_think_time_s)`. File DQN/V11 bỏ qua `search`.
+- **File trọng số** (một file, nạp được bằng `torch.load(weights_only=True)`):
+  `{"format": "v20-phase-experts-1", "model_config": {...}, "models": {"start": state_dict, "mid": state_dict, "end": state_dict}, "meta": {"sources": {phase: {"file", "sha256"}}}}`. Thiếu pha hoặc sai khóa → `ValueError`.
+- **Đóng gói** `python -m ai.deep_rl.v20.pack --start S.pt --mid M.pt --end E.pt --out weights/deeprl-v20.pt`: nhận checkpoint Kaggle dạng `{"model": ...}` hoặc `{"state_dict": ...}`, bỏ tiền tố `core.`, bỏ head phụ/optimizer, nạp `strict` vào `PolicyValueNet`, in SHA-256 file ra.
+- `last_search_info`: `mode = "mcts"`, `phase`, `simulations`, `nodes` (số thế được đánh giá), `eval` (Q của nước chọn, góc bên đi).
+- Cấu hình máy chủ dự án (`local.toml`): chỉ một bot Deep RL, `[bots.deep_rl]` = DQN v1.0 (file local `deeprl-v1.0.pt`). Bot V20 không còn gắn vào ứng dụng; code `v20/` và trọng số `deeprl-v20*.pt` vẫn giữ.
 
 ## 8. Quy trình Git & quản trị repo
 
