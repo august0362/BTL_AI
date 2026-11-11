@@ -1,10 +1,10 @@
-# Deep RL — Quá trình tiến hóa (v1 → V22)
+# Deep RL — Quá trình tiến hóa (v1 → V22X)
 
 Bot cờ vua Option 4 của BTL_AI. File này tóm lược toàn bộ lịch sử: mỗi bản đổi gì, vì sao, kết quả ra
-sao. Số liệu lấy từ log và ZIP kết quả Kaggle, cập nhật tới 08/11/2026. Ngày 08/11 đã xóa mọi notebook,
-data ZIP và ZIP kết quả cũ; `kaggle/` chỉ còn gói V22 (`kaggle/V22_Unified_START_MID/`). Số liệu của các
-đợt cũ chỉ còn trong file này. Checkpoint còn giữ: `weights/` (bot) và trong data ZIP của V22
-(END u13000, V21 TOP1 u3000).
+sao. Số liệu lấy từ log và ZIP kết quả Kaggle, cập nhật tới 11/11/2026. Notebook và ZIP của các đợt
+trước V22 đã xóa ngày 08/11, số liệu của chúng chỉ còn trong file này. `kaggle/` (gitignore) giữ gói V22,
+V22 v3, V22X và ZIP kết quả trong `kaggle/output/`. Bot trong ứng dụng là **RL Hybrid** (§12), trọng số
+phát hành trên GitHub Release.
 
 Quy ước:
 - ply = nửa nước; kết quả ghi Thắng/Hòa/Thua theo bên được kiểm tra; ván chạm trần (cap) không tính hòa.
@@ -13,12 +13,14 @@ Quy ước:
 
 ## 1. Tóm tắt
 
-- **Bảy giai đoạn:** DQN (v1–v10) → Policy–Value + MCTS kiểu AlphaZero (V11–V13) → mạng lớn + loss phụ
+- **Tám giai đoạn:** DQN (v1–v10) → Policy–Value + MCTS kiểu AlphaZero (V11–V13) → mạng lớn + loss phụ
   (V14–V18) → teacher MCTS 96, Value một chiều (V19) → ba mạng chuyên gia theo pha START/MID/END (V20,
   rồi fine-tune END tới u13000) → MID có head chiến thuật (V21) → một mạng START–MID học có giám sát
-  từ Stockfish 19 (V22).
-- **Bài học lớn nhất:** chưa mạng nào đánh giá thế cờ tốt hơn heuristic đếm quân + PST. Value học từ
-  self-play không khái quát sang ván người (MSE trên PGN luôn tệ hơn đoán 0).
+  từ Stockfish 19 (V22) → dữ liệu Lichess eval DB, 50.000 cập nhật, hai biến thể FULL / FILTERED
+  (V22X).
+- **Bài học lớn nhất:** tới V21, chưa mạng nào đánh giá thế cờ tốt hơn heuristic đếm quân + PST vì
+  Value học từ self-play không khái quát (MSE trên PGN luôn tệ hơn đoán 0). Đổi nguồn nhãn sang
+  Stockfish 19 (V22) mới lần đầu thắng được B1.5 và B2 từ khai cuộc chuẩn.
 - **Cải tiến có bằng chứng:** CE anchor (v10), bài tập chiếu hết (v8, v10, V13), curriculum V11.2
   (thắng 11–2, p ≈ 0,022), teacher Tablebase + Mate cho END (hòa tự chơi 55 % → 13 %), START A thắng
   START B 6–0, fine-tune END u6000 → u8000 (26,5/40 trước u6000), V21 thắng MID cũ 4/0/2 và giải đúng
@@ -26,7 +28,10 @@ Quy ước:
 - **Sức cờ từ khai cuộc chuẩn:** chưa thắng B2; trước B1.5 tốt nhất là hòa (V17.2: 0/3/3, V20 START A:
   0/2/4). Từ FEN trung cuộc, V21 TOP1 gặp B1.5 2/1/3, B2 1/1/4. Ở tàn cuộc, END u13000 hơn B1.5
   (26/40) và nhỉnh hơn B2 (23,5/40).
-- **Hiện tại:** V22 (chưng cất Stockfish 19) đang chạy trên Kaggle, chưa có kết quả arena.
+- **Từ V22:** V22 u18000 + END u13000 (hybrid) thắng B1.5 9/2/1, B2 10/0/2, V21 12/0/0. V22X
+  FILTERED u38000 thắng V22 u18000 9/0/3, B2 7/2/3, B1.5 8/4/0 và thắng FULL TOP1 10/0/2.
+- **Hiện tại:** bot `deep_rl` trong ứng dụng = RL Hybrid = V22X FILTERED u38000 (START + MID) + END
+  u13000, MCTS 200 lượt, tối đa 1 s mỗi nước.
 
 ## 2. Niên đại
 
@@ -60,9 +65,12 @@ Quy ước:
 | END FT 2000 | 4/11 | u6000 → u8000: MCTS 300, n-step TD + target network, Advantage | u8000 26,5/40 trước u6000; WDL Tablebase 97,6 → 98,9 % |
 | END FT 13000 | 4–5/11 | u8000 → u13000, nối tiếp nguyên trạng thái, lr 1e-3 | Bão hòa; u13000 thắng vòng cuối 21/40, B2 23,5/40 |
 | V21 MID | 8/11 | Từ END u13000, head Tactical-Safety + 17.055 bài chiến thuật SF19, 3.000 cập nhật | TOP1 u3000: B1.5 2/1/3, B2 1/1/4, MID cũ 4/0/2 |
-| V22 | 8/11 | Một mạng START–MID chưng cất SF19 (depth 12, MultiPV 4), chỉ CE + MSE | Đang chạy trên Kaggle; chưa có kết quả |
+| V22 | 8–9/11 | Một mạng START–MID chưng cất SF19 (depth 12, MultiPV 4), chỉ CE + MSE; v3 thêm Lichess eval DB, kéo tới 30.000 cập nhật | TOP1 u18000 hybrid 32/36: B1.5 9/2/1, B2 10/0/2, V21 12/0/0 |
+| RL Hybrid v1 | 9/11 | V22 u18000 + END u13000 vào ứng dụng, search `ramp` | Thay DQN v1.0 làm bot `deep_rl` |
+| V22X | 10–11/11 | Chỉ Lichess eval DB (2,09 triệu nhãn), 50.000 cập nhật, FULL (mọi pha) vs FILTERED (bỏ G ≤ 4) | FILTERED u38000 thắng FULL u22000 10/0/2, thắng V22 u18000 9/0/3 |
+| RL Hybrid v2 | 11/11 | V22X FILTERED u38000 + END u13000, 1 s mỗi nước | Bot `deep_rl` hiện tại |
 
-## 3. Nền tảng chung (giữ từ v1 tới V22)
+## 3. Nền tảng chung (giữ từ v1 tới V22X)
 
 - **Quan sát:** 18 plane, luôn nhìn từ bên đi (lật bàn khi Đen đi): quân mình 6, quân đối thủ 6, lặp thế
   2, quyền nhập thành 4. Từ V11 thêm plane 19 là ô bắt tốt qua đường. Không có bộ đếm 50 nước.
@@ -474,21 +482,100 @@ sau preflight từ tốc độ Stockfish đo được. Dự kiến 6.000–9.000
   - Sau mỗi mốc, bảng kết quả trên dashboard được cập nhật. Arena cuối chỉ đánh nốt những ván còn thiếu.
   - ZIP resume của bản 1 vẫn dùng được: `MANIFEST.json` ghi bundle v1 trong `resume_compatible`. Lúc build, script kiểm rằng chỉ arena, dashboard và config đánh giá thay đổi.
 
-**Trạng thái:** preflight 26/26, smoke trên máy đạt (ở u0 khớp END; dừng rồi resume liên tục). Bản 1
-đang chạy trên Kaggle (8/11, đã qua u1825), chưa có kết quả arena. Phiên sau resume bằng bản 2. Gói:
-`kaggle/V22_Unified_START_MID/`.
+**Bản 3 (v3, 8/11):** chỉ đổi nguồn dữ liệu, mã train giữ nguyên. Thêm một luồng đọc Lichess eval DB
+(Internet bật): lấy thế G > 4 có ít nhất 2 PV, độ sâu ≥ 16, quy về cùng nhãn `softmax(E/τ)` / `W − L`
+(`sf19-d12-mpv4`). `--resume --total-updates` kéo dài lịch cosine tới 30.000 cập nhật mà không train lại từ
+đầu. ZIP resume của bản 1 và 2 vẫn dùng được. Gói: `kaggle/V22_Unified_START_MID_v3/`.
 
-## 11. Bot trong ứng dụng
+**Kết quả (Kaggle 2×T4, 30.000 cập nhật):**
+- Dữ liệu: 1.019.677 dòng train, khoảng 97 % từ Lichess, phần còn lại là nhãn SF online. Theo pha: gần
+  khai cuộc 662.575, trung cuộc 177.449, cuối trung cuộc 177.959, biên 1.694. Mỗi mẫu dùng trung bình 7,5 lần.
+- Validation (426 dòng giữ riêng, ở u30000): top-1 = 32,9 % (END u13000: 14,8 %, V21 TOP1: 17,8 %), Value
+  MSE = 0,35 (END 0,78, V21 0,76). Lần đầu tiên mạng học Value tốt hơn hẳn điểm khởi đầu.
+- Bài chiến thuật (374 thế): chọn đúng nước tốt nhất 32–35 %, blunder 14–19 %. V21 TOP1: 39,6 % và
+  16,6 %. V22 không giỏi giải bài hơn V21 nhưng chơi cả ván tốt hơn nhiều.
+- Arena: 15 mốc (u2000 → u30000), mỗi mốc 48 ván, tổng 720 ván, MCTS 200.
 
-| Bot | Trọng số | Cách chơi |
+| Hạng | Mốc | Hybrid (/36) | Solo vs B2 (/12) | vs B1.5 | vs B2 | vs V21 |
+|---|---|---|---|---|---|---|
+| 1 | u18000 | 32 | 7 | 9/2/1 | 10/0/2 | 12/0/0 |
+| 2 | u16000 | 29,5 | 8 | 8/2/2 | 7/3/2 | 12/0/0 |
+| 3 | u20000 | 29,5 | 7 | 9/2/1 | 6/3/3 | 12/0/0 |
+| 4 | u22000 | 29 | 6 | 7/4/1 | 8/0/4 | 12/0/0 |
+| 12 | u30000 | 26,5 | 6,5 | 9/1/2 | 6/0/6 | 11/0/1 |
+| 15 | u4000 | 19 | 3 | 4/3/5 | 2/1/9 | 11/0/1 |
+
+- Nhận xét: sức cờ tăng nhanh tới khoảng u16000–u22000, sau đó đi ngang hoặc giảm nhẹ dù loss vẫn giảm.
+  Chế độ solo (một mạng chơi cả tàn cuộc) gặp B2 chỉ 7/12, nên END u13000 vẫn cần cho tàn cuộc.
+- TOP1 = **u18000** (`99907fee…`). Đóng gói u18000 (START = MID) + END u13000 thành `deeprl-v22-hybrid.pt`
+  (`e8f1430b…`) và đưa vào ứng dụng ngày 9/11 (RL Hybrid v1, §12).
+
+## 11. Giai đoạn VIII — V22X: Lichess eval DB, FULL vs FILTERED, 50.000 cập nhật (10–11/11)
+
+**Lỗi tìm ra ở V22 v3:** `lichess.py` bỏ mọi dòng G ≤ 4, còn luồng khám phá dừng ván 6 ply sau khi G ≤ 4. Vì
+vậy dữ liệu gần như không có tàn cuộc. Câu hỏi đặt ra: mạng START–MID có nên học cả tàn cuộc không, khi END
+u13000 vẫn nhận ván từ G ≤ 4?
+
+**Thiết lập:** cùng khởi tạo END u13000, cùng dữ liệu, cùng 50.000 bước AdamW (chỉ đếm bước được áp dụng,
+bỏ bước AMP bị skip), chạy song song trên hai T4:
+- Dữ liệu: đọc Lichess eval DB **một lần**, mọi pha, tới khi đủ 1,75 triệu dòng G > 4. Tổng cộng 2.093.244
+  dòng (quét 3,24 triệu), gồm gần khai cuộc 1.089.010, trung cuộc 301.972, cuối trung cuộc 359.018 và biên/tàn
+  cuộc 343.244. Bỏ luồng khám phá và Stockfish online (`--static-data`: thiếu dữ liệu thì dừng với
+  `data_shortage` thay vì chờ).
+- **FULL** (GPU0): học mọi dòng (2.051.451 dòng train), được đánh giá ở chế độ solo (một mạng chơi cả ván).
+- **FILTERED** (GPU1): bỏ dòng G ≤ 4 lúc nạp (1.715.080 dòng train), đánh giá ở chế độ hybrid (END u13000
+  nhận ván khi G ≤ 4).
+- Validation giống hệt nhau: 41.793 dòng giữ riêng, đo trên 4.096 dòng.
+- Arena chọn mốc sau khi train: mỗi mốc 2.000 cập nhật đánh 36 ván với B1.5, B2 và V21 TOP1. Mạng được tối đa
+  **1 s mỗi ply** (`eval.move_time_s`), bot benchmark không đổi.
+
+**Validation ở u50000:**
+
+| | Top-1 | Policy CE | Value MSE | Value MSE tàn cuộc |
+|---|---|---|---|---|
+| FULL | 37,8 % | 2,21 | 0,144 | 0,117 |
+| FILTERED | 37,1 % | 2,24 | 0,160 | 0,232 |
+| END u13000 (khởi đầu) | 11,1 % | 3,91 | 0,462 | 0,410 |
+| V21 TOP1 | 12,9 % | 3,86 | 0,534 | 0,452 |
+
+**Chọn TOP1:**
+- FULL TOP1 = u22000 (`1d407e45…`, solo): 32,5/36. B1.5 9/2/1, B2 9/3/0, V21 12/0/0.
+- FILTERED TOP1 = u38000 (`20c9484a…`, hybrid): 29/36. B1.5 9/2/1, B2 7/0/5, V21 12/0/0.
+
+**Chung kết (84 ván, mỗi cặp 12 ván; OLD = V22 u18000 + END, tức RL Hybrid v1):**
+
+| Mô hình | vs OLD | vs B2 | vs B1.5 | Đối đầu |
+|---|---|---|---|---|
+| FULL TOP1 (solo) | 9/0/3 | 6/3/3 | 7/3/2 | 2/0/10 trước FILTERED |
+| FILTERED TOP1 (hybrid) | 9/0/3 | 7/2/3 | 8/4/0 | 10/0/2 trước FULL |
+
+![Chung kết V22X](v22x_final.png)
+
+**Kết luận:**
+- Cả hai đều thắng bản cũ 75 %. Số liệu validation của FULL đẹp hơn nhưng FILTERED + END u13000 thắng đối
+  đầu 10/0/2: END u13000 (Tablebase + Mate) vẫn chơi tàn cuộc tốt hơn một mạng học từ nhãn Lichess.
+- Dữ liệu tĩnh nhiều gấp đôi và train lâu gấp 1,7 lần V22 làm TOP1 dời từ u18000 sang u38000.
+- FILTERED u38000 + END u13000 thành **RL Hybrid v2**, đóng gói thành `deeprl-v22x-filtered-hybrid.pt`
+  (`f6969fb9…`), là bot `deep_rl` từ 11/11.
+
+## 12. Bot trong ứng dụng
+
+| Thời gian | Bot `deep_rl` | Trọng số |
 |---|---|---|
-| `deep_rl` | DQN v1.0 (`deeprl-v1.0.pt`) | Alpha-beta độ sâu 3, lá = max Q, 1 s mỗi nước |
+| 10/10 – 18/10 | DQN v1.0, alpha-beta độ sâu 3, lá = max Q | `deeprl-v1.0.pt` |
+| 18/10 – 3/11 | V11.2 CURRICULUM, MCTS 64; rồi thử V20 MCTS 96/196 | `deeprl-v11.2-curriculum.pt`, `deeprl-v20*.pt` |
+| 3/11 – 9/11 | Quay về DQN v1.0 (V20 thua v1.0, §8.7) | `deeprl-v1.0.pt` |
+| 9/11 – 11/11 | RL Hybrid v1: V22 u18000 + END u13000 | `deeprl-v22-hybrid.pt` |
+| từ 11/11 | **RL Hybrid v2**: V22X FILTERED u38000 + END u13000 | `deeprl-v22x-filtered-hybrid.pt` |
 
-Từ 3/11 ứng dụng chỉ giữ một bot Deep RL là v1.0. Các bot V20 (`deeprl-v20.pt` MCTS 96,
-`deeprl-v20-latest.pt` MCTS 196 hoặc alpha-beta) đã gỡ khỏi `local.toml` vì thua v1.0 (§8.7). Code
-`v20/` và trọng số vẫn giữ; muốn dùng lại thì khai báo như trong [README.md](README.md).
+Cách RL Hybrid chơi (`search = "ramp"`, `v20/policy.py::V20RampPolicy`):
+- File có định dạng V20 (`start`, `mid`, `end`), trong đó START = MID = mạng V22X, END = END u13000.
+- MCTS PUCT 200 lượt (c_puct 1,5), cây mới mỗi nước, không nhiễu, dừng sớm khi hết 1 s.
+- Từ nước đầu tiên của mình có `G ≤ 4` (`end_g`), bot chuyển hẳn sang END (`ramp_moves = 1`), γ = 0,995.
+  Đặt `end_g = -1` để chơi solo bằng một mạng.
+- Trọng số phát hành trên GitHub Release; `run.bat` tải và kiểm SHA-256 (README gốc của repo).
 
-## 12. Quy trình dựng bot V20 từ đầu
+## 13. Quy trình dựng bot V20 từ đầu
 
 Notebook của các bước này đã xóa ngày 08/11; mô tả dưới đây đủ để dựng lại.
 
@@ -504,7 +591,7 @@ Mỗi bước là một notebook Kaggle + một data ZIP; chạy `MODE = "smoke"
 5. **Đóng gói** 3 checkpoint thành một file (`python -m ai.deep_rl.v20.pack`), cấu hình bot. Kiểm tra
    trong ứng dụng: cả ván từ thế chuẩn và từ FEN END/MID gặp v1.0 và B2 (§8.7).
 
-## 13. Bài học chính
+## 14. Bài học chính
 
 1. Nhãn quan trọng hơn ngân sách: nhãn sinh từ chính chính sách khám phá (nhiệt độ trên thế mate, xin thua
    trong PGN, ván chạm trần) sai có hệ thống, train lâu hơn không sửa được.
@@ -515,12 +602,16 @@ Mỗi bước là một notebook Kaggle + một data ZIP; chạy `MODE = "smoke"
 5. Giải 4–12 ván tất định rất nhiễu: cần đảo màu, nhiều FEN, sign test.
 6. Teacher chính xác (Tablebase, mate có chứng minh) đáng tin hơn reward shaping.
 7. Train thêm không thay được nguồn nhãn tốt: END u8000 → u13000 bão hòa; V21 giải bài tốt hơn nhưng
-   vẫn thua B1.5/B2 vì nhãn vẫn từ tự chơi. V22 chuyển sang nhãn của Stockfish 19.
+   vẫn thua B1.5/B2 vì nhãn vẫn từ tự chơi. V22 chuyển sang nhãn của Stockfish 19 và lần đầu thắng
+   B1.5/B2.
+8. Chỉ số validation không thay được arena: FULL có Value MSE tàn cuộc tốt hơn FILTERED (0,12 so với 0,23)
+   nhưng thua đối đầu 2/0/10. Mốc tốt nhất cũng không phải mốc cuối (u18000/30000, u38000/50000).
 
-## 14. Hướng tiếp theo
+## 15. Hướng tiếp theo
 
-Việc trước mắt: chạy xong V22 trên Kaggle (resume bằng bản 2), so với V21 TOP1, B1.5 và B2. Nếu vượt thì
-đóng gói V22 + END u13000 thành bot.
+Đã xong: V22 và V22X vượt B1.5/B2 và đã vào ứng dụng. Việc tiếp theo: train lại END từ nhãn Stockfish 19 /
+Tablebase cho tàn cuộc nhiều quân hơn (G ≤ 4 hiện vẫn dùng END u13000 từ self-play), và đo RL Hybrid trước
+B3+ trong ứng dụng.
 
 Khi chơi (không cần train lại), theo thứ tự lợi/chi phí:
 1. END = A5500 (`3622d7dc…`, thắng league, là END* lúc train MID/START) thay cho A4605.

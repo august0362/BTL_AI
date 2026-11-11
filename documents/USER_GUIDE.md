@@ -57,7 +57,7 @@ Thứ hạng, số ván, thắng, hòa, thua, điểm và Elo của người ch�
 - **Cài PyTorch chậm:** lần đầu mất vài phút; để `run.bat` chạy xong, kiểm tra mạng.
 - **Bot bị làm mờ:** bot không khởi tạo được — đọc lý do dưới tên bot (chưa triển khai, thiếu trọng số).
 - **Cửa sổ mờ (Windows):** cập nhật Python/Pygame, khởi động lại game (app đã bật DPI awareness); vẫn mờ thì kiểm tra tùy chọn tương thích DPI của Windows cho Python.
-- **Không tìm thấy Python:** cài Python 3.13 kèm Python Launcher (`py`), chạy lại `run.bat` từ thư mục dự án.
+- **Không tìm thấy Python:** `run.bat` tự tải Python 3.13 portable vào `.runtime\`; chỉ cần có mạng rồi chạy lại.
 
 ## Ảnh minh họa
 
