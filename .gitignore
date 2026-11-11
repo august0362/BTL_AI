@@ -87,3 +87,6 @@ AGENTS.md
 .runtime/
 backend/config/models.json
 *.download
+
+# Live Server: công cụ điều khiển server game (chứa token, chỉ để trên máy)
+live_server/

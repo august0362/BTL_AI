@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 from typing import TYPE_CHECKING
 
@@ -10,10 +11,11 @@ import pygame
 
 from ai import registry
 from ai.base_bot import BotUnavailableError
-from gui.assets_loader import get_font, render_fit
 from gui.render import Render
 from gui.screens.base import Screen
+from gui.theme import side_colors
 from gui.widgets.button import Button
+from gui.widgets.card import draw_option, draw_section_title
 
 if TYPE_CHECKING:
     from gui.app import App
@@ -48,29 +50,22 @@ class SetupHumanScreen(Screen):
         self.color_index = 0
         self.bot_buttons: list[Button] = []
         self.reason_positions: list[tuple[int, int, str]] = []
-        # Two-column grid; more rows (14-15 bots: compact, 19-20 bots: dense) move the title
-        # up and tighten the rows so the colour and action rows keep their place. More than
-        # 20 bots (up to 27) use three columns of at most nine dense rows.
+        # Bot tiles fill the left area (x 24..600, y 100..620): two columns, three when
+        # more than 20 bots are listed. The match card sits on the right.
         columns = 3 if len(self.bot_ids) > 20 else 2
-        rows = (len(self.bot_ids) + columns - 1) // columns
-        if rows > 7:
-            self._title_y, self._label_y = 44, 70
-            row_start, row_step, button_height = 98, 36, 22
-        elif rows > 5:
-            self._title_y, self._label_y = 50, 78
-            row_start, row_step, button_height = 104, 44, 30
-        else:
-            self._title_y, self._label_y = 126, 175
-            row_start, row_step, button_height = 198, 50, 34
-        self._bot_font = 13 if rows > 7 else 15
+        rows = max(1, (len(self.bot_ids) + columns - 1) // columns)
+        row_step = min(56, 520 // rows)
+        button_height = row_step - 14
+        width = (576 - (columns - 1) * 10) // columns
+        self._bot_font = 14 if row_step >= 50 else 12
         for index, bot_id in enumerate(self.bot_ids):
             enabled, reason = self.available[bot_id]
             column = index % columns
-            row_y = row_start + (index // columns) * row_step
-            x = 35 + column * 305 if columns == 3 else 180 + column * 310
+            row_y = 100 + (index // columns) * row_step
+            x = 24 + column * (width + 10)
             self.bot_buttons.append(
                 Button(
-                    pygame.Rect(x, row_y, 290, button_height),
+                    pygame.Rect(x, row_y, width, button_height),
                     app._localized_bot_name(bot_id),
                     enabled=enabled,
                     selected=bot_id == self.selected_bot,
@@ -78,11 +73,9 @@ class SetupHumanScreen(Screen):
             )
             if not enabled:
                 self.reason_positions.append((x, row_y + button_height + 1, reason))
-        color_y = 487
-        action_y = 566
         self.color_buttons = [
             Button(
-                pygame.Rect(324 + index * 104, color_y, 98, 38),
+                pygame.Rect(636 + index * 98, 300, 90, 64),
                 app.translator.t(key),
                 selected=index == 0,
             )
@@ -90,13 +83,9 @@ class SetupHumanScreen(Screen):
                 ("setup.color_white", "setup.color_black", "setup.color_random")
             )
         ]
-        self.start_button = Button(
-            pygame.Rect(330, action_y, 140, 40), app.translator.t("setup.start")
-        )
+        self.start_button = Button(pygame.Rect(624, 470, 312, 60), app.translator.t("setup.start"))
         self.start_button.style = "primary"
-        self.back_button = Button(
-            pygame.Rect(490, action_y, 140, 40), app.translator.t("setup.back")
-        )
+        self.back_button = Button(pygame.Rect(624, 544, 312, 40), app.translator.t("setup.back"))
         self.error = ""
 
     def handle_click(self, x: float, y: float) -> None:
@@ -125,41 +114,47 @@ class SetupHumanScreen(Screen):
             self.app.goto("menu")
 
     def draw(self, canvas: Render) -> None:
-        canvas.fill(self.app.theme.roles["bg"])
-        title = get_font(28, bold=True).render(
-            self.app.translator.t("setup.title_human"), True, self.app.theme.roles["text"]
-        )
-        canvas.blit(title, title.get_rect(center=(480, self._title_y)))
-        canvas.blit(
-            render_fit(
-                get_font(16),
-                self.app.translator.t("setup.choose_bot"),
-                self.app.theme.roles["text_muted"],
-                300,
-            ),
-            (330, self._label_y),
-        )
-        for button in self.bot_buttons:
-            button.draw(canvas, get_font(self._bot_font, bold=True))
+        roles = self.app.theme.roles
+        t = self.app.translator.t
+        canvas.draw_backdrop(roles)
+        draw_section_title(canvas, roles, t("menu.human_vs_bot"), t("setup.choose_bot"), (24, 26))
+        for button, bot_id in zip(self.bot_buttons, self.bot_ids, strict=True):
+            elo = round(self.app.ranking.stats(bot_id).elo)
+            draw_option(canvas, roles, button, f"Elo {elo}", self._bot_font)
         for x, y, reason in self.reason_positions:
-            label = self.app.translator.t("setup.bot_unavailable", reason=reason)
-            text = render_fit(get_font(10), label, self.app.theme.roles["text_muted"], 290)
-            canvas.blit(text, (x, y))
-        canvas.blit(
-            render_fit(
-                get_font(16),
-                self.app.translator.t("setup.your_color"),
-                self.app.theme.roles["text_muted"],
-                300,
-            ),
-            (324, self.color_buttons[0].rect.top - 25),
+            label = t("setup.bot_unavailable", reason=reason)
+            canvas.text(10, label, roles["danger"], (x + 4, y), max_width=280)
+
+        card = pygame.Rect(616, 100, 328, 500)
+        canvas.draw_glass(
+            card, roles["surface"], alpha=225, border=roles["border"], rim=roles["rim"]
         )
-        for button in self.color_buttons:
-            button.draw(canvas, get_font(15))
-        self.start_button.draw(canvas, get_font(17, bold=True))
-        self.back_button.draw(canvas, get_font(16))
+        canvas.text(11, t("setup.match").upper(), roles["glow"], (636, 118), bold=True)
+        name = self.app._localized_bot_name(self.selected_bot) if self.selected_bot else ""
+        canvas.text(22, name, roles["text"], (636, 140), bold=True, max_width=288)
+        if self.selected_bot:
+            stats = self.app.ranking.stats(self.selected_bot)
+            canvas.text(28, f"{round(stats.elo)}", roles["primary"], (636, 180), display=True)
+            canvas.text(11, "ELO", roles["text_muted"], (636, 220), bold=True)
+        canvas.draw_line(roles["border"], (636, 252), (924, 252), 1)
+        canvas.text(11, t("setup.your_color").upper(), roles["text_muted"], (636, 274), bold=True)
+        for index, button in enumerate(self.color_buttons):
+            draw_option(canvas, roles, button, "", 14, center=True)
+            chip = (button.rect.centerx, button.rect.top + 20)
+            white, black = side_colors(self.app.theme)
+            canvas.draw_circle(black if index == 1 else white, chip, 8)
+            if index == 2:
+                # Right half-disk, so the split chip stays round.
+                half = [
+                    (
+                        chip[0] + 8 * math.cos(math.pi * (step / 16 - 0.5)),
+                        chip[1] + 8 * math.sin(math.pi * (step / 16 - 0.5)),
+                    )
+                    for step in range(17)
+                ]
+                canvas.draw_polygon(black, half)
+            canvas.draw_circle(roles["glow"], chip, 8, 1)
+        self.start_button.draw(canvas, 20)
+        self.back_button.draw(canvas, 15)
         if self.error:
-            canvas.blit(
-                render_fit(get_font(13), self.error, self.app.theme.roles["text_muted"], 300),
-                (640, self.back_button.rect.top + 12),
-            )
+            canvas.text(12, self.error, roles["danger"], (624, 596), max_width=312)

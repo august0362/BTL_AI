@@ -29,6 +29,18 @@ def _flatten(values: dict[str, object], prefix: str = "") -> dict[str, str]:
     return flattened
 
 
+_ACRONYMS = {"rl": "RL", "gpt": "GPT", "tt": "TT", "mcts": "MCTS", "nnue": "NNUE"}
+
+
+def _fallback_player_name(bot_id: str) -> str:
+    """Name a bot that has no locale entry (e.g. removed bots in old tournament data)."""
+    words = [_ACRONYMS.get(word, word.capitalize()) for word in bot_id.split("_") if word]
+    if words and words[0].startswith("Bench") and words[0][5:].isdigit():
+        rest = " ".join(words[1:])
+        return f"Benchmark {words[0][5:]}" + (f" · {rest}" if rest else "")
+    return " ".join(words) or bot_id
+
+
 class Translator:
     """Load and serve strings from the selected locale TOML file."""
 
@@ -65,5 +77,5 @@ class Translator:
         """
         value = self._overrides.get(key) or self._strings.get(key)
         if value is None:
-            return key
+            return _fallback_player_name(key[8:]) if key.startswith("players.") else key
         return value.format_map(_MissingParams(params))

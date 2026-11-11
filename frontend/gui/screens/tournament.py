@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from gui.assets_loader import get_font
 from gui.render import Render
 from gui.screens.base import Screen
 from gui.tournament_view import (
@@ -21,6 +20,7 @@ from gui.tournament_view import (
     tournament_rows,
 )
 from gui.widgets.button import Button
+from gui.widgets.card import draw_section_title, draw_stat, draw_table, rank_color
 from gui.widgets.progress_bar import ProgressBar
 
 if TYPE_CHECKING:
@@ -31,16 +31,16 @@ class TournamentScreen(Screen):
     """Show the AI ranking table with a start button and history entry."""
 
     COLUMNS = (
-        ("tournament.rank", 70),
-        ("tournament.bot", 130),
-        ("tournament.games", 412),
-        ("tournament.wins", 466),
-        ("tournament.draws", 516),
+        ("tournament.rank", 44),
+        ("tournament.bot", 96),
+        ("tournament.games", 404),
+        ("tournament.wins", 462),
+        ("tournament.draws", 514),
         ("tournament.losses", 562),
-        ("tournament.points", 612),
-        ("tournament.time", 668),
-        ("tournament.memory", 744),
-        ("tournament.total", 828),
+        ("tournament.points", 614),
+        ("tournament.time", 676),
+        ("tournament.memory", 762),
+        ("tournament.total", 848),
     )
     # Clickable headers -> row field; any other order falls back to the ranking after 5 s.
     SORT_COLUMNS = {
@@ -54,25 +54,20 @@ class TournamentScreen(Screen):
         "tournament.total": "total",
     }
     SORT_RESET_MS = 5_000
+    TABLE = pygame.Rect(24, 96, 912, 416)
+    HEADER_Y = 104
+    ROW_TOP = 140
+    CONTROLS = pygame.Rect(24, 522, 912, 106)
 
     def __init__(self, app: App) -> None:
         super().__init__(app)
-        # More than 14 bots (19 by default) use 16 px rows and move the controls down.
-        self._dense = len(app.tournament.settings.bots) > 14
-        # More than 20 bots (up to 25): 14 px rows, controls pushed further down.
-        self._crowded = len(app.tournament.settings.bots) > 20
-        button_y = 556 if self._crowded else 524 if self._dense else 470
-        self._status_y = 526 if self._crowded else 486 if self._dense else 434
-        self.start = Button(
-            pygame.Rect(70, button_y, 210, 44), app.translator.t("tournament.start")
-        )
+        self.start = Button(pygame.Rect(40, 580, 200, 38), app.translator.t("tournament.start"))
         self.start.style = "primary"
         self.history = Button(
-            pygame.Rect(300, button_y, 180, 44), app.translator.t("tournament.history")
+            pygame.Rect(252, 580, 168, 38), app.translator.t("tournament.history")
         )
-        self.back = Button(pygame.Rect(800, button_y, 90, 44), app.translator.t("setup.back"))
-        progress_y = 508 if self._crowded else 466 if self._dense else 410
-        self.progress_bar = ProgressBar(pygame.Rect(70, progress_y, 820, 12))
+        self.back = Button(pygame.Rect(792, 580, 128, 38), app.translator.t("setup.back"))
+        self.progress_bar = ProgressBar(pygame.Rect(40, 558, 880, 8))
         self.sort_field = DEFAULT_SORT
         self._sorted_at = 0
 
@@ -81,8 +76,8 @@ class TournamentScreen(Screen):
         rects = {}
         for index, (key, x) in enumerate(self.COLUMNS):
             if key in self.SORT_COLUMNS:
-                right = self.COLUMNS[index + 1][1] if index + 1 < len(self.COLUMNS) else 900
-                rects[self.SORT_COLUMNS[key]] = pygame.Rect(x - 4, 122, right - x, 24)
+                right = self.COLUMNS[index + 1][1] if index + 1 < len(self.COLUMNS) else 928
+                rects[self.SORT_COLUMNS[key]] = pygame.Rect(x - 4, self.HEADER_Y, right - x, 28)
         return rects
 
     def sort_by(self, field: str) -> None:
@@ -108,59 +103,52 @@ class TournamentScreen(Screen):
 
     def draw(self, canvas: Render) -> None:
         roles = self.app.theme.roles
-        translator = self.app.translator
+        t = self.app.translator.t
         snapshot = self.app.tournament.snapshot()
-        canvas.fill(roles["bg"])
-        canvas.blit(
-            get_font(28, bold=True).render(translator.t("tournament.title"), True, roles["text"]),
-            (70, 46),
+        canvas.draw_backdrop(roles)
+        draw_section_title(canvas, roles, t("tournament.eyebrow"), t("tournament.title"), (24, 26))
+        bots = str(len(self.app.tournament.settings.bots))
+        draw_stat(canvas, roles, pygame.Rect(632, 24, 140, 60), t("tournament.stat_bots"), bots)
+        draw_stat(
+            canvas,
+            roles,
+            pygame.Rect(784, 24, 152, 60),
+            t("tournament.stat_games"),
+            self._games_label(snapshot),
         )
-        if snapshot.running:
-            # Elapsed and estimated remaining time, right-aligned in the top-right corner.
-            elapsed = format_duration(snapshot.elapsed_s)
-            clock = (
-                translator.t("tournament.estimating", elapsed=elapsed)
-                if snapshot.eta_s is None
-                else translator.t(
-                    "tournament.eta", elapsed=elapsed, eta=format_duration(snapshot.eta_s)
-                )
-            )
-            image = get_font(14).render(clock, True, roles["text_muted"])
-            width = image.get_width() / max(canvas.scale, 1e-6)
-            canvas.blit(image, (890 - width, 58))
-        standings = self._standings(snapshot)
-        canvas.blit(
-            get_font(14).render(self._status(snapshot), True, roles["text_muted"]), (70, 96)
-        )
+
         if (
             self.sort_field != DEFAULT_SORT
             and pygame.time.get_ticks() - self._sorted_at >= self.SORT_RESET_MS
         ):
             self.sort_field = DEFAULT_SORT
-        header_font = get_font(12, bold=True)
-        for key, x in self.COLUMNS:
-            sorted_here = self.SORT_COLUMNS.get(key) == self.sort_field
-            label = translator.t(key) + (" ▼" if sorted_here else "")
-            color = roles["text"] if sorted_here else roles["accent"]
-            canvas.blit(header_font.render(label, True, color), (x, 128))
-        row_font = get_font(11 if self._dense else 12)
-        playing = set(snapshot.current_pair or ()) if snapshot.running else set()
-        rows = sort_rows(tournament_rows(standings, translator), self.sort_field)
-        # Nine bots keep the roomy 26 px rows; up to 14 bots use 18 px rows, up to 20 use 16 px,
-        # more (up to 25) use 14 px.
-        row_step = (
-            26 if len(rows) <= 9 else 18 if len(rows) <= 14 else 16 if len(rows) <= 20 else 14
+        rows = sort_rows(
+            tournament_rows(self._standings(snapshot), self.app.translator), self.sort_field
         )
+        row_step = max(12, min(36, (self.TABLE.bottom - 8 - self.ROW_TOP) // max(1, len(rows))))
+        headers = [
+            (
+                t(key) + (" \u25bc" if self.SORT_COLUMNS.get(key) == self.sort_field else ""),
+                x,
+                self.SORT_COLUMNS.get(key) == self.sort_field,
+            )
+            for key, x in self.COLUMNS
+        ]
+        draw_table(canvas, roles, self.TABLE, headers, len(rows), row_step, self.ROW_TOP)
+        size = 14 if row_step >= 30 else 13 if row_step >= 20 else 11
+        playing = set(snapshot.current_pair or ()) if snapshot.running else set()
         for index, row in enumerate(rows):
-            y = (150 if row_step <= 16 else 154) + index * row_step
+            top = self.ROW_TOP + index * row_step
+            y = top + (row_step - round(size * 1.3)) // 2
             if row.player_id in playing:
-                # Highlight the two bots of the game in progress with theme colours.
-                band = pygame.Rect(60, y - 2, 840, row_step)
-                canvas.draw_rect(roles["surface"], band, radius=6)
-                canvas.draw_rect(roles["accent"], band, width=2, radius=6)
+                # Highlight the two bots of the game in progress.
+                band = pygame.Rect(self.TABLE.left + 8, top, self.TABLE.width - 16, row_step)
+                canvas.draw_glass(band, roles["accent"], alpha=70, radius=6, border=roles["glow"])
+                canvas.draw_rect(roles["glow"], (band.left, top + 3, 3, row_step - 6), radius=2)
+            rank = f"{row.rank:02d}"
+            canvas.text(size, rank, rank_color(roles, row.rank), (44, y), bold=True)
+            canvas.text(size, row.name, roles["text"], (96, y), bold=row.rank <= 3, max_width=296)
             values = (
-                str(row.rank),
-                row.name,
                 str(row.games),
                 str(row.wins),
                 str(row.draws),
@@ -168,30 +156,52 @@ class TournamentScreen(Screen):
                 format_points(row.points),
                 format_seconds(row.think_time_s),
                 format_memory(row.memory_mb),
-                format_total(row.total),
             )
-            for value, (_, x) in zip(values, self.COLUMNS, strict=True):
-                canvas.blit(row_font.render(value, True, roles["text"]), (x, y))
-        self.progress_bar.draw(canvas, self.app.theme, snapshot.progress)
-        self.start.label = translator.t(
-            "tournament.stop" if snapshot.running else "tournament.start"
+            for value, (_, x) in zip(values, self.COLUMNS[2:9], strict=True):
+                canvas.text(size, value, roles["text_muted"], (x, y))
+            canvas.text(size, format_total(row.total), roles["primary"], (848, y), bold=True)
+
+        canvas.draw_glass(
+            self.CONTROLS,
+            roles["surface"],
+            alpha=205,
+            radius=14,
+            border=roles["border"],
+            rim=roles["rim"],
         )
-        self.start.style = "danger" if snapshot.running else "primary"
-        self.start.draw(canvas, get_font(15, bold=True))
-        self.history.draw(canvas, get_font(14))
-        self.back.draw(canvas, get_font(14))
-        if snapshot.error:
-            canvas.blit(
-                get_font(12).render(snapshot.error, True, roles["danger"]), (70, self._status_y)
+        dot = roles["glow"] if snapshot.running else roles["text_disabled"]
+        canvas.draw_circle(dot, (46, 541), 4)
+        canvas.text(13, self._status(snapshot), roles["text"], (58, 532), bold=True, max_width=520)
+        if snapshot.running:
+            # Elapsed and estimated remaining time, right-aligned on the status line.
+            elapsed = format_duration(snapshot.elapsed_s)
+            clock = (
+                t("tournament.estimating", elapsed=elapsed)
+                if snapshot.eta_s is None
+                else t("tournament.eta", elapsed=elapsed, eta=format_duration(snapshot.eta_s))
             )
+            width = round(canvas.font(12, canvas.scale).size(clock)[0] / canvas.scale)
+            canvas.text(12, clock, roles["text_muted"], (920 - width, 533))
+        self.progress_bar.draw(canvas, self.app.theme, snapshot.progress)
+        self.start.label = t("tournament.stop" if snapshot.running else "tournament.start")
+        self.start.style = "danger" if snapshot.running else "primary"
+        self.start.draw(canvas, 15)
+        self.history.draw(canvas, 14)
+        self.back.draw(canvas, 14)
+        if snapshot.error:
+            canvas.text(12, snapshot.error, roles["danger"], (436, 590), max_width=340)
         elif snapshot.running and snapshot.current_pair is not None:
             first, second = snapshot.current_pair
-            text = translator.t(
-                "tournament.current_pair",
-                a=translator.t(f"players.{first}"),
-                b=translator.t(f"players.{second}"),
-            )
-            canvas.blit(get_font(12).render(text, True, roles["text_muted"]), (70, self._status_y))
+            text = t("tournament.current_pair", a=t(f"players.{first}"), b=t(f"players.{second}"))
+            canvas.text(12, text, roles["glow"], (436, 590), bold=True, max_width=340)
+
+    def _games_label(self, snapshot) -> str:
+        if snapshot.running and snapshot.games_total:
+            return f"{snapshot.games_done}/{snapshot.games_total}"
+        battles = self.app.tournament_history.list()
+        if battles:
+            return f"{battles[0].games_played}/{battles[0].games_total}"
+        return "0"
 
     def _standings(self, snapshot):
         if snapshot.standings:

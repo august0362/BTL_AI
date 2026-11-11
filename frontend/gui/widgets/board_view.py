@@ -53,19 +53,16 @@ class BoardView:
                 overlay.fill((*pygame.Color(self.theme.roles["board_select"])[:3], 100))
                 canvas.surface.blit(overlay, canvas.point((x, y)))
             if targets and square in targets:
-                piece = board.piece_at(square)
-                center = (x + 40, y + 40)
-                if piece:
-                    canvas.draw_circle(
-                        (*pygame.Color(self.theme.roles["board_hint"])[:3], 140), center, 37, 5
-                    )
+                hint = pygame.Color(self.theme.roles["board_hint"])[:3]
+                if board.piece_at(square):
+                    canvas.draw_circle((*hint, 150), (x + 40, y + 40), 37, 4)
                 else:
-                    canvas.draw_circle(
-                        (*pygame.Color(self.theme.roles["board_hint"])[:3], 105), center, 12
+                    side = round(80 * canvas.scale)
+                    dot = pygame.Surface((side, side), pygame.SRCALPHA)
+                    pygame.draw.circle(
+                        dot, (*hint, 70), (side // 2, side // 2), round(13 * canvas.scale)
                     )
-                    canvas.draw_circle(
-                        (*pygame.Color(self.theme.roles["board_light"])[:3], 165), center, 8
-                    )
+                    canvas.surface.blit(dot, canvas.point((x, y)))
             if board.is_check() and board.king(board.turn) == square:
                 canvas.draw_rect(self.theme.roles["danger"], rect, 5)
             piece = board.piece_at(square)

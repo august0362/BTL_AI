@@ -38,17 +38,30 @@ class Button:
                 color = roles["primary_hover"]
             elif self.style != "danger":
                 color = roles["secondary_hover"]
-        canvas.draw_rect(color, self.rect, radius=10)
-        canvas.draw_rect(
-            roles["accent"]
-            if self.selected
-            else roles[self.style]
-            if self.hovered
-            else roles["border"],
-            self.rect,
-            2 if self.selected else 1,
-            radius=10,
+        quiet = (
+            self.enabled
+            and self.style == "secondary"
+            and not (self.selected or self.pressed or self.hovered)
         )
+        if quiet:
+            canvas.draw_glass(
+                self.rect,
+                roles["surface_alt"],
+                alpha=225,
+                radius=10,
+                border=roles["border"],
+                rim=roles["rim"],
+            )
+        else:
+            canvas.draw_rect(color, self.rect, radius=10)
+            edge = (
+                roles["primary"]
+                if self.selected
+                else roles["glow"]
+                if self.hovered
+                else roles["border"]
+            )
+            canvas.draw_rect(edge, self.rect, 2 if self.selected else 1, radius=10)
         text_color = roles["text_disabled"]
         if self.enabled:
             if self.selected:
@@ -63,6 +76,8 @@ class Button:
                 text_color = roles.get("on_danger", roles["on_primary"])
             elif self.style == "primary":
                 text_color = roles["on_primary"]
+            elif quiet:
+                text_color = roles["text"]
             else:
                 text_color = roles["on_secondary"]
         font_size = (
@@ -73,7 +88,7 @@ class Button:
             self.label,
             text_color,
             max(1, self.rect.width - 16),
-            bold=font.get_bold() if isinstance(font, pygame.font.Font) else False,
+            bold=True,
         )
         canvas.surface.blit(text, text.get_rect(center=canvas.point(self.rect.center)))
 

@@ -8,12 +8,12 @@ import chess
 import pygame
 
 from gui import board_geometry, game_info
-from gui.assets_loader import get_font, render_fit
 from gui.controller import ControllerSnapshot
 from gui.move_input import MoveInput
 from gui.render import Render
 from gui.screens.base import Screen
 from gui.sound import sound_for_move
+from gui.theme import side_colors
 from gui.widgets.board_view import BoardView
 from gui.widgets.button import Button
 from gui.widgets.eval_bar import draw_eval_bar
@@ -42,21 +42,22 @@ class GameScreen(Screen):
             "timing": PanelSection("timing", 467, 74, expanded=False),
             "captured": PanelSection("captured", 554, 62, expanded=False),
         }
-        self.stop_button = Button(pygame.Rect(656, 592, 132, 34), app.translator.t("game.stop"))
+        self.stop_button = Button(pygame.Rect(652, 594, 142, 38), app.translator.t("game.stop"))
         self.stop_button.style = "danger"
         self.menu_button = Button(
-            pygame.Rect(800, 592, 136, 34), app.translator.t("game.back_to_menu")
+            pygame.Rect(802, 594, 146, 38), app.translator.t("game.back_to_menu")
         )
         self.result_again = Button(
-            pygame.Rect(284, 412, 166, 46), app.translator.t("game.play_again")
+            pygame.Rect(140, 376, 172, 46), app.translator.t("game.play_again")
         )
+        self.result_again.style = "primary"
         self.result_menu = Button(
-            pygame.Rect(464, 412, 166, 46), app.translator.t("game.back_to_menu")
+            pygame.Rect(328, 376, 172, 46), app.translator.t("game.back_to_menu")
         )
         self.is_bot_game = app.game_mode == "bot_vs_bot"
-        self.sound_button = Button(pygame.Rect(648, 8, 96, 30), "")
-        self.pause_button = Button(pygame.Rect(748, 8, 80, 30), app.translator.t("game.pause"))
-        self.speed_button = Button(pygame.Rect(832, 8, 120, 30), self._speed_label())
+        self.sound_button = Button(pygame.Rect(652, 8, 92, 30), "")
+        self.pause_button = Button(pygame.Rect(750, 8, 84, 30), app.translator.t("game.pause"))
+        self.speed_button = Button(pygame.Rect(840, 8, 108, 30), self._speed_label())
         self.speaker_button_rect = self.sound_button.rect
         self.pause_button_rect = self.pause_button.rect
         self.speed_button_rect = self.speed_button.rect
@@ -156,7 +157,8 @@ class GameScreen(Screen):
             )
 
     def draw(self, canvas: Render) -> None:
-        canvas.fill(self.app.theme.roles["bg"])
+        roles = self.app.theme.roles
+        canvas.draw_backdrop(roles)
         snapshot = self.app.controller.snapshot()
         targets = self.input.legal_targets(snapshot.board) if snapshot.waiting_for_human else set()
         self.board_view.draw(
@@ -169,7 +171,7 @@ class GameScreen(Screen):
             dialog=self.dialog,
             translator=self.app.translator,
         )
-        canvas.draw_rect(self.app.theme.roles["surface"], (640, 0, 320, 640))
+        canvas.draw_line(roles["border"], (640, 0), (640, 640), 1)
         self._draw_panel(canvas, snapshot)
         self.sound_button.label = self.app.translator.t(
             "settings.sound_on" if self.app.sound_enabled else "settings.sound_off"
@@ -179,32 +181,41 @@ class GameScreen(Screen):
             self.pause_button.label = self.app.translator.t(
                 "game.resume" if snapshot.paused else "game.pause"
             )
-            self.pause_button.draw(canvas, get_font(11, bold=True))
-            self.speed_button.draw(canvas, get_font(11, bold=True))
+            self.pause_button.draw(canvas, 12)
+            self.speed_button.draw(canvas, 12)
         if snapshot.finished:
             self._draw_result(canvas, snapshot)
 
     def _draw_sound_button(self, canvas: Render) -> None:
         label = self.sound_button.label
         self.sound_button.label = ""
-        self.sound_button.draw(canvas, get_font(11, bold=True))
+        self.sound_button.draw(canvas, 12)
         self.sound_button.label = label
         color = self.app.theme.roles["text"]
+        left, top = self.sound_button.rect.topleft
         canvas.draw_polygon(
             color,
-            [(652, 18), (658, 18), (667, 12), (667, 34), (658, 28), (652, 28)],
+            [
+                (left + 10, top + 11),
+                (left + 15, top + 11),
+                (left + 22, top + 6),
+                (left + 22, top + 24),
+                (left + 15, top + 19),
+                (left + 10, top + 19),
+            ],
         )
         if self.app.sound_enabled:
-            canvas.draw_arc(color, pygame.Rect(662, 14, 14, 18), -0.9, 0.9, 2)
-            canvas.draw_arc(color, pygame.Rect(662, 10, 21, 26), -0.9, 0.9, 2)
+            canvas.draw_arc(color, pygame.Rect(left + 18, top + 9, 10, 12), -0.9, 0.9, 2)
+            canvas.draw_arc(color, pygame.Rect(left + 18, top + 5, 16, 20), -0.9, 0.9, 2)
         else:
-            canvas.draw_line(color, (670, 15), (681, 29), 2)
-            canvas.draw_line(color, (681, 15), (670, 29), 2)
-        canvas.text(13, self.sound_button.label, color, (689, 15), bold=True, max_width=47)
+            canvas.draw_line(color, (left + 26, top + 11), (left + 33, top + 19), 2)
+            canvas.draw_line(color, (left + 33, top + 11), (left + 26, top + 19), 2)
+        canvas.text(
+            12, self.sound_button.label, color, (left + 40, top + 7), bold=True, max_width=48
+        )
 
-    def _draw_panel(self, canvas: pygame.Surface, snapshot: ControllerSnapshot) -> None:
-        font = get_font(15)
-        header = get_font(16, bold=True)
+    def _player_names(self, snapshot: ControllerSnapshot) -> tuple[str, str, str]:
+        """Return White, Black and the name of the side that is thinking."""
         bot_name = self.app.bot_display_name
         human_name = self.app.translator.t("players.human")
         if self.is_bot_game:
@@ -219,44 +230,72 @@ class GameScreen(Screen):
         else:
             white_name = human_name if self.app.human_color else bot_name
             black_name = bot_name if self.app.human_color else human_name
+        return white_name, black_name, bot_name
+
+    def _layout_sections(self, status: str) -> dict[str, int]:
+        """Stack the panel cards and give the move list the remaining height."""
+        header = PanelSection.HEADER
+        body = {
+            "players": (82 if self.is_bot_game else 64) + (20 if status else 0),
+            "eval": 40,
+            "moves": 0,
+            "timing": 44,
+            "captured": 26,
+        }
+        fixed = sum(
+            header + 6 + (body[key] + 4 if section.expanded else 0)
+            for key, section in self.sections.items()
+            if key != "moves"
+        )
+        body["moves"] = max(48, 586 - 46 - fixed - header - 4)
+        top = 46
+        for key, section in self.sections.items():
+            height = header + (body[key] + 4 if section.expanded else 0)
+            section.rect.top = top
+            section.rect.height = height
+            top += height + 6
+        return body
+
+    def _draw_panel(self, canvas: Render, snapshot: ControllerSnapshot) -> None:
+        roles = self.app.theme.roles
+        t = self.app.translator.t
+        white_name, black_name, bot_name = self._player_names(snapshot)
         status = (
-            self.app.translator.t("game.thinking", name=bot_name)
+            t("game.thinking", name=bot_name)
             if snapshot.thinking
-            else self.app.translator.t("game.your_turn")
+            else t("game.your_turn")
             if snapshot.waiting_for_human
             else ""
         )
-        body_heights = {
-            "players": 88 + (20 if status else 0)
-            if self.is_bot_game
-            else 46 + (20 if status else 0),
-            "eval": 96,
-            "moves": 130,
-            "timing": 38,
-            "captured": 24,
-        }
-        section_y = 44
-        for key, section in self.sections.items():
-            height = 28 + (body_heights[key] if section.expanded else 0)
-            section.rect.top = section_y
-            section.rect.height = height
-            section_y += height + 4
+        body = self._layout_sections(status)
+        header = PanelSection.HEADER
 
         players = self.sections["players"]
-        players.draw_header(canvas, self.app.translator.t("panel.score"), header, self.app.theme)
+        players.draw_header(canvas, t("panel.score"), 11, self.app.theme)
         if players.expanded:
-            white_label = self.app.translator.t("setup.color_white")
-            black_label = self.app.translator.t("setup.color_black")
-            canvas.blit(
-                render_fit(font, f"{white_label}  {white_name}", self.app.theme.roles["text"], 248),
-                (680, players.rect.top + 31),
-            )
-            canvas.blit(
-                render_fit(
-                    font, f"{black_label}  {black_name}", self.app.theme.roles["text_muted"], 248
-                ),
-                (680, players.rect.top + 54),
-            )
+            left = players.rect.left
+            y = players.rect.top + header
+            for color, name in ((chess.WHITE, white_name), (chess.BLACK, black_name)):
+                active = not snapshot.finished and snapshot.board.turn == color
+                if active:
+                    canvas.draw_glass(
+                        (left + 8, y, players.rect.width - 16, 28),
+                        roles["accent"],
+                        alpha=55,
+                        radius=8,
+                    )
+                chip = side_colors(self.app.theme)[0 if color == chess.WHITE else 1]
+                canvas.draw_circle(chip, (left + 22, y + 14), 7)
+                canvas.draw_circle(roles["glow"], (left + 22, y + 14), 7, 1)
+                canvas.text(
+                    14,
+                    name,
+                    roles["text"] if active else roles["text_muted"],
+                    (left + 38, y + 5),
+                    bold=active,
+                    max_width=players.rect.width - 52,
+                )
+                y += 30
             if self.is_bot_game:
                 series = snapshot.series_result
                 score_a, score_b = (
@@ -266,90 +305,97 @@ class GameScreen(Screen):
                 )
                 if not snapshot.first_is_white:
                     score_a, score_b = score_b, score_a  # keep "White - Black" order
-                score = f"{score_a:g} - {score_b:g}"
-                info = self.app.translator.t(
-                    "game.game_index", index=snapshot.game_index, total=snapshot.n_games
+                info = t("game.game_index", index=snapshot.game_index, total=snapshot.n_games)
+                canvas.text(18, f"{score_a:g} - {score_b:g}", roles["primary"], (left + 16, y))
+                canvas.text(
+                    12,
+                    info,
+                    roles["text_muted"],
+                    (left + 110, y + 4),
+                    max_width=players.rect.width - 124,
                 )
-                canvas.blit(
-                    render_fit(
-                        get_font(12), f"{score}   ·   {info}", self.app.theme.roles["accent"], 248
-                    ),
-                    (680, players.rect.top + 77),
-                )
+                y += 22
             if status:
-                canvas.blit(
-                    render_fit(
-                        get_font(13),
-                        status,
-                        self.app.theme.roles["attention"]
-                        if snapshot.waiting_for_human
-                        else self.app.theme.roles["accent"],
-                        248,
-                    ),
-                    (680, players.rect.top + (96 if self.is_bot_game else 77)),
+                canvas.text(
+                    12,
+                    status,
+                    roles["attention"] if snapshot.waiting_for_human else roles["glow"],
+                    (left + 16, y + 2),
+                    bold=True,
+                    max_width=players.rect.width - 30,
                 )
 
         evaluation = self.sections["eval"]
-        evaluation.draw_header(
-            canvas, self.app.translator.t("panel.eval_bar"), header, self.app.theme
-        )
+        evaluation.draw_header(canvas, t("panel.eval_bar"), 11, self.app.theme)
         if evaluation.expanded:
             value = snapshot.moves[-1].material_eval if snapshot.moves else 0.0
-            body_y = evaluation.rect.top + 32
-            draw_eval_bar(canvas, pygame.Rect(668, body_y, 24, 72), value, self.app.theme)
-            canvas.blit(
-                font.render(f"{value:+.2f}", True, self.app.theme.roles["text"]), (705, body_y + 15)
+            body_y = evaluation.rect.top + header
+            draw_eval_bar(
+                canvas,
+                pygame.Rect(evaluation.rect.left + 14, body_y + 14, 170, 10),
+                value,
+                self.app.theme,
             )
-            canvas.blit(
-                render_fit(
-                    font,
-                    self.app.translator.t("game.check") if snapshot.board.is_check() else "",
-                    self.app.theme.roles["danger"],
-                    220,
-                ),
-                (705, body_y + 42),
+            canvas.text(
+                18,
+                f"{value:+.2f}",
+                roles["text"],
+                (evaluation.rect.left + 198, body_y + 4),
             )
+            if snapshot.board.is_check():
+                canvas.text(
+                    12,
+                    t("game.check"),
+                    roles["danger"],
+                    (evaluation.rect.left + 180, evaluation.rect.top + 7),
+                    bold=True,
+                    max_width=80,
+                )
 
         moves = self.sections["moves"]
-        moves.draw_header(canvas, self.app.translator.t("panel.moves"), header, self.app.theme)
+        moves.draw_header(canvas, t("panel.moves"), 11, self.app.theme)
         if moves.expanded:
             draw_move_list(
                 canvas,
-                pygame.Rect(656, moves.rect.top + 32, 280, 122),
+                pygame.Rect(
+                    moves.rect.left + 8,
+                    moves.rect.top + header,
+                    moves.rect.width - 16,
+                    body["moves"],
+                ),
                 snapshot.moves,
-                font,
+                13,
                 self.app.theme,
             )
 
         timing = self.sections["timing"]
-        timing.draw_header(
-            canvas, self.app.translator.t("panel.think_time"), header, self.app.theme
-        )
+        timing.draw_header(canvas, t("panel.think_time"), 11, self.app.theme)
         if timing.expanded:
             summary = game_info.think_time_summary(snapshot.moves)
             for row, color in enumerate((chess.WHITE, chess.BLACK)):
                 latest, average = summary[color]
+                label = t("setup.color_white" if color == chess.WHITE else "setup.color_black")
                 text = "—" if latest is None else f"{latest:.2f}s / {average:.2f}s"
-                canvas.blit(
-                    render_fit(get_font(13), text, self.app.theme.roles["text"], 244),
-                    (682, timing.rect.top + 32 + row * 18),
-                )
+                y = timing.rect.top + header + row * 20
+                canvas.text(12, label, roles["text_muted"], (timing.rect.left + 16, y + 1))
+                canvas.text(13, text, roles["text"], (timing.rect.left + 96, y), bold=True)
 
         captured = self.sections["captured"]
-        captured.draw_header(
-            canvas, self.app.translator.t("panel.captured"), header, self.app.theme
-        )
+        captured.draw_header(canvas, t("panel.captured"), 11, self.app.theme)
         if captured.expanded:
             pieces = game_info.captured_pieces(snapshot.board)
-            white = self.app.translator.t("setup.color_white")
-            black = self.app.translator.t("setup.color_black")
+            white = t("setup.color_white")
+            black = t("setup.color_black")
             text = f"{white}: {len(pieces[chess.WHITE])}   ·   {black}: {len(pieces[chess.BLACK])}"
-            canvas.blit(
-                render_fit(get_font(13), text, self.app.theme.roles["text"], 248),
-                (680, captured.rect.top + 34),
+            canvas.text(
+                13,
+                text,
+                roles["text"],
+                (captured.rect.left + 16, captured.rect.top + header),
+                max_width=captured.rect.width - 30,
             )
-        self.stop_button.draw(canvas, get_font(13, bold=True))
-        self.menu_button.draw(canvas, get_font(13, bold=True))
+        self.stop_button.draw(canvas, 14)
+        self.menu_button.draw(canvas, 14)
 
     def _series_scores(self, snapshot: ControllerSnapshot) -> tuple[float, float]:
         """Calculate the live score from games already completed in the series."""
@@ -369,10 +415,16 @@ class GameScreen(Screen):
         return score_a, score_b
 
     def _draw_result(self, canvas: pygame.Surface, snapshot: ControllerSnapshot) -> None:
-        side = round(640 * canvas.scale)
-        veil = pygame.Surface((side, side), pygame.SRCALPHA)
-        veil.fill((*pygame.Color(self.app.theme.roles["bg"])[:3], 205))
-        canvas.surface.blit(veil, (0, 0))
+        roles = self.app.theme.roles
+        canvas.draw_glass((0, 0, 640, 640), roles["bg"], alpha=170, radius=0)
+        canvas.draw_glass(
+            (100, 196, 440, 248),
+            roles["surface"],
+            alpha=240,
+            radius=16,
+            border=roles["rim"],
+            rim=roles["glow"],
+        )
         record = snapshot.finished_games[-1] if snapshot.finished_games else None
         if record is None:
             title = self.app.translator.t("game.result.aborted")
@@ -401,15 +453,18 @@ class GameScreen(Screen):
             name = self.app._localized_bot_name(winner_id)
             title = self.app.translator.t(key, name=name, score=score)
             reason = ""
-        canvas.blit(
-            render_fit(get_font(28, bold=True), title, self.app.theme.roles["text"], 440),
-            (100, 270),
+        canvas.text(
+            12,
+            self.app.translator.t("game.game_over").upper(),
+            roles["glow"],
+            (0, 0),
+            bold=True,
+            center=(320, 228),
         )
-        canvas.blit(
-            render_fit(get_font(17), reason, self.app.theme.roles["text_muted"], 440), (100, 316)
-        )
-        self.result_again.draw(canvas, get_font(15, bold=True))
-        self.result_menu.draw(canvas, get_font(15, bold=True))
+        canvas.text(26, title, roles["text"], (0, 0), bold=True, max_width=400, center=(320, 276))
+        canvas.text(16, reason, roles["text_muted"], (0, 0), max_width=400, center=(320, 320))
+        self.result_again.draw(canvas, 15)
+        self.result_menu.draw(canvas, 15)
 
     def on_exit(self) -> None:
         self.input.clear()

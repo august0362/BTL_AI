@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from gui.assets_loader import get_font, render_fit
 from gui.render import Render
 from gui.screens.base import Screen
 from gui.widgets.button import Button
+from gui.widgets.card import draw_scroll_arrow, draw_section_title, draw_stat
 from tournament.records import GameRecord
 
 if TYPE_CHECKING:
@@ -20,22 +20,26 @@ class HistoryScreen(Screen):
     """Show recent game records."""
 
     VISIBLE_ROWS = 7
+    ROW_TOP = 104
+    ROW_STEP = 64
 
     def __init__(self, app: App) -> None:
         super().__init__(app)
         self.records = app.history.list()
         self.scroll_offset = 0
         self.rows = [
-            Button(pygame.Rect(80, 155 + i * 58, 800, 48), "") for i in range(self.VISIBLE_ROWS)
+            Button(pygame.Rect(24, self.ROW_TOP + i * self.ROW_STEP, 860, 56), "")
+            for i in range(self.VISIBLE_ROWS)
         ]
-        self.scroll_up = pygame.Rect(884, 155, 28, 22)
-        self.scroll_down = pygame.Rect(916, 155, 28, 22)
+        self.scroll_up = pygame.Rect(896, 104, 40, 40)
+        self.scroll_down = pygame.Rect(896, 504, 40, 40)
         self.export_button = Button(
-            pygame.Rect(365, 570, 135, 38),
+            pygame.Rect(632, 576, 148, 40),
             app.translator.t("history.export_pgn"),
             enabled=bool(self.records),
         )
-        self.back = Button(pygame.Rect(515, 570, 120, 38), app.translator.t("setup.back"))
+        self.export_button.style = "primary"
+        self.back = Button(pygame.Rect(792, 576, 144, 40), app.translator.t("setup.back"))
         self.selected = 0
         self.notice = ""
         self._update_rows()
@@ -59,24 +63,28 @@ class HistoryScreen(Screen):
             self._scroll(-dy)
 
     def _label(self, record: GameRecord) -> str:
+        return f"{record.white_name} vs {record.black_name}"
+
+    def _details(self, record: GameRecord) -> str:
+        """Return the outcome, termination and series note of a record."""
+        t = self.app.translator.t
         outcome = (
-            self.app.translator.t("game.result.draw")
+            t("game.result.draw")
             if record.result.winner is None
-            else self.app.translator.t(
+            else t(
                 "game.result.win",
                 name=record.white_name if record.result.winner else record.black_name,
             )
         )
-        termination = self.app.translator.t(f"termination.{record.result.termination.value}")
-        suffix = f"  •  {record.started_at[:10]}"
+        details = f"{outcome} · {t(f'termination.{record.result.termination.value}')}"
         if record.series_game_index:
-            suffix += "  •  " + self.app.translator.t(
+            details += " · " + t(
                 "history.series_note",
                 index=record.series_game_index,
                 total=3,
                 series=(record.series_id or "")[:6],
             )
-        return f"{record.white_name} vs {record.black_name} — {outcome} — {termination}{suffix}"
+        return details
 
     def handle_click(self, x: float, y: float) -> None:
         point = (x, y)
@@ -105,52 +113,96 @@ class HistoryScreen(Screen):
             self.app.goto("menu")
 
     def draw(self, canvas: Render) -> None:
-        canvas.fill(self.app.theme.roles["bg"])
-        canvas.blit(
-            get_font(28, bold=True).render(
-                self.app.translator.t("history.title"), True, self.app.theme.roles["text"]
-            ),
-            (80, 82),
+        roles = self.app.theme.roles
+        t = self.app.translator.t
+        canvas.draw_backdrop(roles)
+        draw_section_title(canvas, roles, t("history.eyebrow"), t("history.title"), (24, 26))
+        draw_stat(
+            canvas,
+            roles,
+            pygame.Rect(784, 24, 152, 60),
+            t("history.stat_games"),
+            str(len(self.records)),
         )
         if not self.records:
-            canvas.blit(
-                get_font(18).render(
-                    self.app.translator.t("history.empty"), True, self.app.theme.roles["text_muted"]
-                ),
-                (80, 160),
+            canvas.draw_glass(
+                (24, 104, 912, 120), roles["surface"], alpha=205, radius=14, border=roles["border"]
             )
-        for button in self.rows:
+            canvas.text(
+                16, t("history.empty"), roles["text_muted"], (0, 0), bold=True, center=(480, 164)
+            )
+        for row_index, button in enumerate(self.rows):
             if button.enabled:
-                button.draw(canvas, get_font(12))
-        self._draw_scroll_button(canvas, self.scroll_up, up=True)
-        self._draw_scroll_button(canvas, self.scroll_down, up=False)
-        self.export_button.draw(canvas, get_font(13))
-        self.back.draw(canvas, get_font(13))
+                self._draw_row(canvas, button, self.records[self.scroll_offset + row_index])
+        if len(self.records) > self.VISIBLE_ROWS:
+            self._draw_scrollbar(canvas)
         if self.notice:
-            canvas.blit(
-                render_fit(get_font(12), self.notice, self.app.theme.roles["accent"], 900),
-                (80, 620),
-            )
+            canvas.text(12, self.notice, roles["glow"], (24, 590), bold=True, max_width=590)
+        self.export_button.draw(canvas, 14)
+        self.back.draw(canvas, 14)
 
-    def _draw_scroll_button(self, canvas: Render, rect: pygame.Rect, *, up: bool) -> None:
-        enabled = (
-            self.scroll_offset > 0
-            if up
-            else (self.scroll_offset + self.VISIBLE_ROWS < len(self.records))
+    def _draw_row(self, canvas: Render, button: Button, record: GameRecord) -> None:
+        roles = self.app.theme.roles
+        rect = button.rect
+        canvas.draw_glass(
+            rect,
+            roles["surface_alt"] if button.hovered else roles["surface"],
+            alpha=230 if button.hovered else 210,
+            radius=12,
+            border=roles["glow"] if button.hovered or button.selected else roles["border"],
+            rim=roles["rim"],
         )
-        color = self.app.theme.roles["accent"] if enabled else self.app.theme.roles["border"]
-        canvas.draw_rect(self.app.theme.roles["surface"], rect, radius=4)
-        center_x = rect.centerx
-        if up:
-            points = [
-                (center_x, rect.top + 5),
-                (rect.left + 6, rect.bottom - 5),
-                (rect.right - 6, rect.bottom - 5),
-            ]
-        else:
-            points = [
-                (center_x, rect.bottom - 5),
-                (rect.left + 6, rect.top + 5),
-                (rect.right - 6, rect.top + 5),
-            ]
-        canvas.draw_polygon(color, points)
+        if button.selected:
+            canvas.draw_rect(
+                roles["glow"], (rect.left, rect.top + 10, 3, rect.height - 20), radius=2
+            )
+        winner = record.result.winner
+        score = "½-½" if winner is None else "1-0" if winner else "0-1"
+        badge = pygame.Rect(rect.left + 14, rect.centery - 15, 60, 30)
+        canvas.draw_glass(
+            badge,
+            roles["accent"] if winner is not None else roles["surface_alt"],
+            alpha=90 if winner is not None else 200,
+            radius=15,
+            border=roles["border"],
+        )
+        canvas.text(
+            14,
+            score,
+            roles["primary"] if winner is not None else roles["text_muted"],
+            (0, 0),
+            bold=True,
+            center=badge.center,
+        )
+        date = record.started_at[:10]
+        date_width = round(canvas.font(12, canvas.scale).size(date)[0] / canvas.scale)
+        canvas.text(12, date, roles["text_muted"], (rect.right - 16 - date_width, rect.top + 20))
+        width = rect.width - 108 - date_width - 24
+        canvas.text(
+            15,
+            button.label,
+            roles["text"],
+            (rect.left + 90, rect.top + 9),
+            bold=True,
+            max_width=width,
+        )
+        canvas.text(
+            12,
+            self._details(record),
+            roles["text_muted"],
+            (rect.left + 90, rect.top + 32),
+            max_width=width,
+        )
+
+    def _draw_scrollbar(self, canvas: Render) -> None:
+        roles = self.app.theme.roles
+        max_offset = len(self.records) - self.VISIBLE_ROWS
+        draw_scroll_arrow(canvas, roles, self.scroll_up, up=True, enabled=self.scroll_offset > 0)
+        draw_scroll_arrow(
+            canvas, roles, self.scroll_down, up=False, enabled=self.scroll_offset < max_offset
+        )
+        track = pygame.Rect(914, 152, 4, 344)
+        canvas.draw_rect(roles["surface_alt"], track, radius=2)
+        thumb_height = max(24, round(track.height * self.VISIBLE_ROWS / len(self.records)))
+        top = track.top + round((track.height - thumb_height) * self.scroll_offset / max_offset)
+        canvas.draw_rect(roles["primary"], (track.left, top, track.width, thumb_height), radius=2)

@@ -8,10 +8,11 @@ import pygame
 
 from ai import registry
 from ai.base_bot import BotUnavailableError
-from gui.assets_loader import get_font, render_fit
 from gui.render import Render
 from gui.screens.base import Screen
+from gui.theme import side_colors
 from gui.widgets.button import Button
+from gui.widgets.card import draw_option, draw_section_title
 
 if TYPE_CHECKING:
     from gui.app import App
@@ -90,22 +91,18 @@ class SetupBotsScreen(Screen):
         ]
         self.format_buttons = [
             Button(
-                pygame.Rect(350 + i * 135, 562 if has_unavailable else 564, 125, 32),
+                pygame.Rect(156 + i * 128, 584, 120, 40),
                 app.translator.t(key),
                 selected=i == self.series_index,
             )
             for i, key in enumerate(("setup.single_game", "setup.best_of_three"))
         ]
-        swap_rect = (
-            pygame.Rect(220, 564, 112, 32)
-            if self._compact
-            else pygame.Rect(424, 524 if has_unavailable else 530, 112, 30)
-        )
+        # One action row under both lists: series format, swap, start and back.
+        swap_rect = pygame.Rect(412, 584, 110, 40)
         self.swap = Button(swap_rect, app.translator.t("setup.swap"))
-        action_y = 602 if has_unavailable else 604
-        self.start = Button(pygame.Rect(360, action_y, 110, 28), app.translator.t("setup.start"))
+        self.start = Button(pygame.Rect(546, 584, 140, 40), app.translator.t("setup.start"))
         self.start.style = "primary"
-        self.back = Button(pygame.Rect(490, action_y, 110, 28), app.translator.t("setup.back"))
+        self.back = Button(pygame.Rect(694, 584, 110, 40), app.translator.t("setup.back"))
         self.error = ""
 
     def _bot_rect(self, side: int, index: int, row_step: int, height: int) -> pygame.Rect:
@@ -149,60 +146,54 @@ class SetupBotsScreen(Screen):
             self.app.goto("menu")
 
     def draw(self, canvas: Render) -> None:
-        canvas.fill(self.app.theme.roles["bg"])
-        font = get_font(11 if self._split else 12 if self._compact else 13)
-        canvas.blit(
-            get_font(27, bold=True).render(
-                self.app.translator.t("setup.title_bots"), True, self.app.theme.roles["text"]
-            ),
-            (295, self._top - 84),
+        roles = self.app.theme.roles
+        t = self.app.translator.t
+        canvas.draw_backdrop(roles)
+        size = 11 if self._split else 12 if self._compact else 13
+        draw_section_title(
+            canvas, roles, t("menu.bot_vs_bot"), t("setup.title_bots"), (24, self._top - 92)
         )
-        for x, key in (
-            (self._column_x[0][0], "setup.white_bot"),
-            (self._column_x[1][0], "setup.black_bot"),
+        for side, (columns, key) in enumerate(
+            zip(self._column_x, ("setup.white_bot", "setup.black_bot"), strict=True)
         ):
-            canvas.blit(
-                font.render(self.app.translator.t(key), True, self.app.theme.roles["text_muted"]),
-                (x, self._top - 26),
+            buttons = self.black_buttons if side else self.buttons
+            area = buttons[0].rect.unionall([button.rect for button in buttons]).inflate(16, 16)
+            area = pygame.Rect(area.left, area.top - 22, area.width, area.height + 22)
+            canvas.draw_glass(area, roles["surface"], alpha=150, radius=14, border=roles["border"])
+            chip = side_colors(self.app.theme)[side]
+            canvas.draw_circle(chip, (columns[0] + 5, self._top - 18), 5)
+            canvas.draw_circle(roles["glow"], (columns[0] + 5, self._top - 18), 5, 1)
+            canvas.text(
+                11,
+                t(key).upper(),
+                roles["text_muted"],
+                (columns[0] + 16, self._top - 25),
+                bold=True,
             )
-        for i, button in enumerate(self.buttons):
-            button.selected = i == self.white_index
-            button.draw(canvas, font)
-            bot_id = self.bot_ids[i]
-            if not self.available[bot_id][0]:
-                reason = self.app.translator.t(
-                    "setup.bot_unavailable", reason=self.available[bot_id][1]
-                )
-                canvas.blit(
-                    render_fit(
-                        get_font(9), reason, self.app.theme.roles["text_muted"], button.rect.width
-                    ),
-                    (button.rect.left, button.rect.bottom + 1),
-                )
-        for i, button in enumerate(self.black_buttons):
-            button.selected = i == self.black_index
-            button.draw(canvas, font)
-            bot_id = self.bot_ids[i]
-            if not self.available[bot_id][0]:
-                reason = self.app.translator.t(
-                    "setup.bot_unavailable", reason=self.available[bot_id][1]
-                )
-                canvas.blit(
-                    render_fit(
-                        get_font(9), reason, self.app.theme.roles["text_muted"], button.rect.width
-                    ),
-                    (button.rect.left, button.rect.bottom + 1),
-                )
-        self.swap.draw(canvas, font)
+        for selected, buttons in (
+            (self.white_index, self.buttons),
+            (self.black_index, self.black_buttons),
+        ):
+            for i, button in enumerate(buttons):
+                button.selected = i == selected
+                draw_option(canvas, roles, button, "", size)
+                bot_id = self.bot_ids[i]
+                if not self.available[bot_id][0]:
+                    reason = t("setup.bot_unavailable", reason=self.available[bot_id][1])
+                    canvas.text(
+                        9,
+                        reason,
+                        roles["danger"],
+                        (button.rect.left, button.rect.bottom + 1),
+                        max_width=button.rect.width,
+                    )
+        self.swap.draw(canvas, size)
         for button in self.format_buttons:
-            button.draw(canvas, font)
-        self.start.draw(canvas, font)
-        self.back.draw(canvas, font)
+            button.draw(canvas, size)
+        self.start.draw(canvas, size + 1)
+        self.back.draw(canvas, size)
         if self.error:
-            canvas.blit(
-                render_fit(get_font(10), self.error, self.app.theme.roles["text_muted"], 250),
-                (620, 610),
-            )
+            canvas.text(10, self.error, roles["danger"], (156, 628), max_width=648)
 
     def _button_label(self, bot_id: str) -> str:
         """Return the translated bot label."""

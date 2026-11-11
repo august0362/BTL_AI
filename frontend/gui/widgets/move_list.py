@@ -1,4 +1,4 @@
-"""Scrollable SAN move list."""
+"""SAN move table that keeps the latest moves in view."""
 
 from __future__ import annotations
 
@@ -15,25 +15,30 @@ def draw_move_list(
     font: int,
     theme=None,
 ) -> None:
-    """Draw moves in two-column chess notation, keeping the latest in view."""
+    """Draw moves as numbered White / Black rows, highlighting the latest one."""
     roles = (theme or THEMES["dark_winter"]).roles
-    canvas.draw_rect(roles["surface"], rect, radius=10)
-    line_height = 25
+    line_height = 24
     visible = max(1, rect.height // line_height)
     rows = [
         (moves[index].san, moves[index + 1].san if index + 1 < len(moves) else "")
         for index in range(0, len(moves), 2)
     ]
-    rows = rows[-visible:]
-    for row_index, (white, black) in enumerate(rows):
-        y = rect.top + 5 + row_index * line_height
-        if row_index == len(rows) - 1:
-            canvas.draw_rect(
-                roles["surface_alt"],
-                (rect.left + 3, y - 2, rect.width - 6, 23),
-                radius=8,
+    first = max(0, len(rows) - visible)
+    column = (rect.width - 44) // 2
+    for row_index, (white, black) in enumerate(rows[first:]):
+        y = rect.top + row_index * line_height
+        number = first + row_index + 1
+        if number % 2 == 0:
+            canvas.draw_rect(roles["surface_alt"], (rect.left, y, rect.width, 22), radius=6)
+        latest_x = None
+        if first + row_index == len(rows) - 1:
+            latest_x = rect.left + 40 + (column if black else 0)
+            canvas.draw_glass(
+                (latest_x - 4, y + 1, column - 4, 20), roles["accent"], alpha=70, radius=5
             )
-        label = f"{len(moves) // 2 - len(rows) + row_index + 1:>2}."
-        canvas.text(font, label, roles["text_muted"], (rect.left + 8, y))
-        canvas.text(font, white, roles["text"], (rect.left + 39, y))
-        canvas.text(font, black, roles["text"], (rect.left + 103, y))
+            canvas.draw_rect(roles["glow"], (latest_x - 4, y + 3, 2, 16))
+        canvas.text(font, f"{number}", roles["text_muted"], (0, 0), center=(rect.left + 18, y + 11))
+        canvas.text(font, white, roles["text"], (rect.left + 40, y + 2), max_width=column - 8)
+        canvas.text(
+            font, black, roles["text"], (rect.left + 40 + column, y + 2), max_width=column - 8
+        )
