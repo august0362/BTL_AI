@@ -8,9 +8,8 @@ from pathlib import Path
 
 import chess
 
-from ai.base_bot import BaseBot
+from ai.base_bot import BaseBot, BotUnavailableError
 from ai.genetic_alphabeta.genome import (
-    DEFAULT_GENOME,
     WEIGHTS_FILENAME,
     Genome,
     load_genome,
@@ -58,21 +57,35 @@ def _resolve_time_limit(settings: dict) -> float | None:
 
 
 def _resolve_genome(settings: dict) -> Genome:
-    """Pick evaluation weights: `genome` config wins, then weights.json, else default."""
-    override = settings.get("genome")
+    """Pick the genome: `genome` config, then weights.json, else refuse to start.
+
+    Evolution writes `weights.json`; without it the bot raises
+    `BotUnavailableError` so a forgotten training run cannot silently ship a
+    genome without knowledge. `allow_random_init` (contract config) keeps tests
+    runnable without the file.
+    """
+    allow_empty = bool(settings.get("allow_random_init"))
     try:
+        override = settings.get("genome")
         if isinstance(override, Genome):
             return override
         if isinstance(override, list):
-            return Genome.from_list([float(v) for v in override])
+            return Genome.from_list([float(value) for value in override])
         if isinstance(override, dict):
-            return Genome.from_dict({k: float(v) for k, v in override.items()})
+            return Genome.from_dict(override)
         weights_path = Path(__file__).with_name(WEIGHTS_FILENAME)
         if weights_path.is_file():
             return load_genome(weights_path)
-    except (ValueError, OSError, TypeError):
-        pass
-    return DEFAULT_GENOME
+        if allow_empty:
+            return Genome()
+        raise BotUnavailableError(
+            f"genetic_alphabeta: thiếu {WEIGHTS_FILENAME} — "
+            "chạy `python -m ai.genetic_alphabeta.evolution` trước"
+        )
+    except (ValueError, OSError, TypeError) as exc:
+        if allow_empty:
+            return Genome()
+        raise BotUnavailableError(f"genetic_alphabeta: {exc}") from exc
 
 
 def _normalize(score: float) -> float:

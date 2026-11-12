@@ -9,7 +9,7 @@ import chess
 from chess.polyglot import zobrist_hash
 
 from ai.genetic_alphabeta.evaluation import evaluate
-from ai.genetic_alphabeta.genome import Genome
+from ai.genetic_alphabeta.genome import PIECE_VALUES, Genome
 
 MATE_SCORE = 100000.0
 TIE_EPS = 1e-9
@@ -72,11 +72,14 @@ def _check_deadline(stats: dict[str, int], deadline: float | None) -> None:
 def _move_order_key(
     board: chess.Board,
     move: chess.Move,
-    genome: Genome,
     tt_move: chess.Move | None = None,
     killer: chess.Move | None = None,
 ) -> tuple:
-    """Order key: TT move and killers first, then captures (MVV-LVA), promotions."""
+    """Order key: TT move and killers first, then captures (MVV-LVA), promotions.
+
+    Ordering uses the fixed `PIECE_VALUES`, never the genome: a mutated genome
+    must not be able to break capture ordering and slow the search down.
+    """
     score = 0.0
     if tt_move is not None and move == tt_move:
         score += 1_000_000.0
@@ -84,28 +87,27 @@ def _move_order_key(
         score += 500_000.0
     if board.is_capture(move):
         if board.is_en_passant(move):
-            victim = genome.pawn
+            victim = PIECE_VALUES[chess.PAWN]
         else:
             captured = board.piece_type_at(move.to_square)
-            victim = genome.piece_value(captured) if captured else 0.0
+            victim = PIECE_VALUES[captured] if captured else 0.0
         attacker = board.piece_type_at(move.from_square)
-        attacker_value = genome.piece_value(attacker) if attacker else 0.0
+        attacker_value = PIECE_VALUES[attacker] if attacker else 0.0
         score += 100_000.0 + 10.0 * victim - attacker_value / 16.0
     if move.promotion:
-        score += 90_000.0 + 10.0 * genome.piece_value(move.promotion)
+        score += 90_000.0 + 10.0 * PIECE_VALUES[move.promotion]
     return (-score, move.uci())
 
 
 def ordered_moves(
     board: chess.Board,
-    genome: Genome,
     tt_move: chess.Move | None = None,
     killer: chess.Move | None = None,
 ) -> list[chess.Move]:
     """Legal moves sorted for good alpha-beta cutoffs (deterministic)."""
     return sorted(
         board.legal_moves,
-        key=lambda move: _move_order_key(board, move, genome, tt_move, killer),
+        key=lambda move: _move_order_key(board, move, tt_move, killer),
     )
 
 
@@ -149,7 +151,7 @@ def _quiesce(
     # Generate captures once; stalemate is only possible when there are none.
     captures = sorted(
         board.generate_legal_captures(),
-        key=lambda move: _move_order_key(board, move, genome),
+        key=lambda move: _move_order_key(board, move),
     )
     if not captures and not any(board.generate_legal_moves()):
         return 0.0
@@ -162,10 +164,10 @@ def _quiesce(
         # Delta pruning: a capture whose victim cannot recover alpha is hopeless.
         if move.promotion is None:
             if board.is_en_passant(move):
-                victim_value = genome.pawn
+                victim_value = PIECE_VALUES[chess.PAWN]
             else:
                 captured = board.piece_type_at(move.to_square)
-                victim_value = genome.piece_value(captured) if captured else 0.0
+                victim_value = PIECE_VALUES[captured] if captured else 0.0
             if stand_pat + victim_value + 1.0 <= alpha:
                 continue
         board.push(move)
@@ -233,7 +235,7 @@ def _negamax(
                     return entry_score
 
     killer = killers.get(board.ply()) if killers is not None else None
-    moves = ordered_moves(board, genome, tt_move, killer)
+    moves = ordered_moves(board, tt_move, killer)
     if not moves:
         return (-MATE_SCORE + ply) if board.is_check() else 0.0
 
@@ -302,7 +304,7 @@ def _root(
         if entry is not None:
             tt_move = entry[3]
     killer = killers.get(board.ply()) if killers is not None else None
-    moves = ordered_moves(board, genome, tt_move, killer)
+    moves = ordered_moves(board, tt_move, killer)
     candidates: list[chess.Move] = []
     best_score = -MATE_SCORE - 1.0
     alpha = -MATE_SCORE - 1.0
@@ -354,7 +356,7 @@ def search_iterative(
     Returns (move, nodes, side-to-move score, depth reached). The board is left
     unchanged.
     """
-    moves = ordered_moves(board, genome)
+    moves = ordered_moves(board)
     if not moves:
         raise ValueError("No legal moves: the position is already over")
     target = max(1, max_depth)
@@ -393,7 +395,7 @@ def best_move(
     The board is left unchanged. Equal-best moves (within TIE_EPS) are picked
     with `rng` when given, otherwise the first in ordered (UCI-stable) order.
     """
-    moves = ordered_moves(board, genome)
+    moves = ordered_moves(board)
     if not moves:
         raise ValueError("No legal moves: the position is already over")
     search_depth = max(1, depth)
