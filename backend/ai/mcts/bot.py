@@ -17,18 +17,23 @@ class MctsBot(BaseBot):
 
     bot_id = "mcts"
     display_name = "MCTS"
+    implementation_id = "mcts-heuristic-b2-1"
 
     def __init__(self, config: dict | None = None) -> None:
         super().__init__(config)
         self._rng = random.Random(self.config.get("seed"))
         fast = bool(self.config.get("fast_mode", False))
         seconds = self._number("max_think_time_s", 0.05 if fast else 1.0)
-        exploration = self._number("exploration_constant", math.sqrt(2.0))
-        if seconds < 0 or exploration < 0:
-            raise ValueError("mcts: time and exploration_constant must be non-negative")
         heuristics = self.config.get("use_heuristics", True)
         if not isinstance(heuristics, bool):
             raise ValueError("mcts: use_heuristics must be a boolean")
+        exploration = self._number("exploration_constant", 0.015 if heuristics else math.sqrt(2.0))
+        if seconds < 0 or exploration < 0:
+            raise ValueError("mcts: time and exploration_constant must be non-negative")
+        leaf_depth = self._integer("leaf_depth", 2, minimum=0)
+        if leaf_depth > 2:
+            raise ValueError("mcts: leaf_depth must be 0, 1 or 2")
+        tree_limit = self._integer("max_tree_nodes", 1024, minimum=2)
         simulations = self._integer("simulations", 32 if fast else 100_000, minimum=1)
         plies = self._integer("rollout_max_plies", 4 if heuristics else 120, minimum=0)
         self.search_config = SearchConfig(
@@ -38,6 +43,8 @@ class MctsBot(BaseBot):
             max_think_time_s=min(seconds, 0.05) if fast and seconds > 0 else seconds,
             use_heuristics=heuristics,
             claim_draw=bool(self.config.get("claim_draw", True)),
+            leaf_depth=leaf_depth if heuristics and not fast else -1,
+            max_tree_nodes=tree_limit,
         )
 
     def _number(self, key: str, default: float) -> float:
@@ -61,4 +68,5 @@ class MctsBot(BaseBot):
         started = time.perf_counter()
         result = search(board, self.search_config, self._rng, started=started)
         self.last_search_info = result.info
+        self.last_search_info["implementation"] = self.implementation_id
         return result.move
