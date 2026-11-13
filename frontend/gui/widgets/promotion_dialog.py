@@ -55,10 +55,13 @@ class PromotionDialog:
             canvas.draw_glass(
                 tile, roles["surface_alt"], alpha=230, radius=12, border=roles["border"]
             )
-            canvas.blit_center(
-                piece_image(self.piece_set, prefix + chess.piece_symbol(piece_type).upper(), 70),
-                tile.center,
+            # Load at physical size so the piece is resampled once and stays sharp.
+            image = piece_image(
+                self.piece_set,
+                prefix + chess.piece_symbol(piece_type).upper(),
+                round(70 * canvas.scale),
             )
+            canvas.surface.blit(image, image.get_rect(center=canvas.point(tile.center)))
         cancel = pygame.Rect(0, self.CANCEL_TOP + 6, 140, 32)
         cancel.centerx = self.rect.centerx
         canvas.draw_glass(

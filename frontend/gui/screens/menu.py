@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import pygame
@@ -92,13 +93,13 @@ class MenuScreen(Screen):
                 icon_rect,
                 radius=10,
             )
+            # Icons are built at physical pixel size (resampled once) so they stay sharp.
+            target = canvas.rect(icon_rect)
             if icon is None:
-                self._draw_power(canvas, roles, icon_rect)
+                image = _power_icon(target.width, roles["danger"])
             else:
-                canvas.blit_image(
-                    piece_image("rhosgfx", icon, box - 8),
-                    (icon_rect.left + 4, icon_rect.top + 4),
-                )
+                image = piece_image("rhosgfx", icon, target.width - round(8 * canvas.scale))
+            canvas.surface.blit(image, image.get_rect(center=target.center))
 
         canvas.draw_glass(
             (56, 550, 848, 40), roles["surface"], alpha=170, radius=12, border=roles["border"]
@@ -124,15 +125,6 @@ class MenuScreen(Screen):
             )
 
     @staticmethod
-    def _draw_power(canvas: Render, roles: dict[str, str], rect: pygame.Rect) -> None:
-        """Draw a power symbol inside an icon box."""
-        ring = rect.inflate(-14, -14)
-        canvas.draw_arc(roles["danger"], ring, math.radians(-50), math.radians(230), 2)
-        canvas.draw_line(
-            roles["danger"], (rect.centerx, ring.top - 2), (rect.centerx, rect.centery), 2
-        )
-
-    @staticmethod
     def _draw_emblem(canvas: Render, roles: dict[str, str]) -> None:
         """Draw the frost rings and king that decorate the header."""
         center = (800, 118)
@@ -143,6 +135,28 @@ class MenuScreen(Screen):
         king = piece_image("rhosgfx", "wK", round(80 * canvas.scale)).copy()
         king.set_alpha(220)
         canvas.surface.blit(king, king.get_rect(center=canvas.point(center)))
+
+
+@lru_cache(maxsize=8)
+def _power_icon(size: int, color: str) -> pygame.Surface:
+    """Build an anti-aliased power symbol (open ring + stem, round caps) ``size`` px square."""
+    ss = 4  # draw 4x larger, then downscale: smooth edges without pygame's jagged arcs
+    big = size * ss
+    image = pygame.Surface((big, big), pygame.SRCALPHA)
+    center = big / 2
+    radius = big * 0.27
+    half = max(1.0, big * 0.045)  # half the stroke width
+    # Ring: open at the top (40 degrees each side), angles clockwise from 12 o'clock.
+    for degrees in range(40, 321):
+        angle = math.radians(degrees)
+        point = (center + radius * math.sin(angle), center - radius * math.cos(angle))
+        pygame.draw.circle(image, color, point, half)
+    # Stem: from just above the ring down to the middle of the circle.
+    top, bottom = center - radius - half * 0.6, center - radius * 0.05
+    pygame.draw.rect(image, color, pygame.Rect(center - half, top, 2 * half, bottom - top))
+    for y in (top, bottom):
+        pygame.draw.circle(image, color, (center, y), half)
+    return pygame.transform.smoothscale(image, (size, size))
 
 
 def _display_width(canvas: Render, size: int, text: str) -> int:

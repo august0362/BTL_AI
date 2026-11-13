@@ -4,8 +4,9 @@ Checkpoints come from the newest GitHub release tagged ``models-*`` (asset ``mod
 checkpoint is downloaded only when missing or changed, checked against its SHA-256 and moved into
 place atomically. The applied manifest is kept in ``backend/config/models.json``; its ``config``
 table is merged into the game configuration (core.config). Without network the last verified
-checkpoints are used. The game runs in a Windows job object, so closing it (or this console)
-stops every process it started.
+checkpoints are used. On Windows the game then runs in a detached windowless process (pythonw,
+output in .runtime/game.log), so run.bat's console closes as soon as the game opens; that process
+holds a job object, so closing the game window stops every process it started.
 """
 
 from __future__ import annotations
@@ -198,15 +199,45 @@ def _kill_on_close_job() -> None:
     # The handle stays open until this process exits; then Windows kills the whole job.
 
 
+GAME_LOG = ROOT / ".runtime" / "game.log"
+DETACHED = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+BREAKAWAY = 0x01000000  # CREATE_BREAKAWAY_FROM_JOB
+
+
+def run_game() -> int:
+    """Run main.py inside a kill-on-close job, logging its output; return its exit code."""
+    _kill_on_close_job()
+    GAME_LOG.parent.mkdir(exist_ok=True)
+    with GAME_LOG.open("w", encoding="utf-8") as log:
+        return subprocess.call(
+            [sys.executable, str(ROOT / "main.py")], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT
+        )
+
+
+def start_detached() -> None:
+    """Start ``run_game`` in a windowless process that outlives this console."""
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    command = [str(pythonw if pythonw.is_file() else sys.executable), __file__, "--run-game"]
+    try:
+        subprocess.Popen(command, cwd=ROOT, creationflags=DETACHED | BREAKAWAY, close_fds=True)
+    except OSError:  # the console's job may forbid breakaway; then just detach
+        subprocess.Popen(command, cwd=ROOT, creationflags=DETACHED, close_fds=True)
+
+
 def main() -> int:
-    """Update models, run the game and return its exit code."""
+    """Update models, then start the game (detached on Windows) and return an exit code."""
+    if "--run-game" in sys.argv[1:]:
+        return run_game()
     print("[3/4] Kiểm tra model AI...", flush=True)
     if not update_models():
         print("LỖI: Chưa có model AI và không tải được. Hãy kết nối Internet rồi chạy lại run.bat.")
         return 1
-    print("[4/4] Mở game. Đóng cửa sổ game để thoát hoàn toàn.", flush=True)
-    _kill_on_close_job()
-    return subprocess.call([sys.executable, str(ROOT / "main.py")], cwd=ROOT)
+    if os.name != "nt":
+        print("[4/4] Mở game. Đóng cửa sổ game để thoát hoàn toàn.", flush=True)
+        return subprocess.call([sys.executable, str(ROOT / "main.py")], cwd=ROOT)
+    print("[4/4] Mở game... (cửa sổ này tự đóng; lỗi của game ghi ở .runtime/game.log)", flush=True)
+    start_detached()
+    return 0
 
 
 if __name__ == "__main__":
