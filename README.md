@@ -87,8 +87,8 @@ riêng, gồm giải đấu và Stockfish của Benchmark 9. Nếu đóng cửa 
   [CONTRIBUTING](documents/CONTRIBUTING.md).
 - Kiểm tra trước khi gửi PR: `run.bat --test` (pytest), hoặc `another\scripts\test.bat` (pytest + ruff + lint-imports).
 - Dữ liệu benchmark thô, log và zip thử nghiệm trong `backend/ai/*/results/` chỉ giữ trên máy,
-  không đi kèm bản clone mới. Báo cáo kết quả vẫn được giữ trong các file Markdown của bot;
-  dữ liệu đã công bố trước đây vẫn có trong lịch sử Git.
+  không đi kèm bản clone mới. Dữ liệu và tài liệu thử nghiệm đã công bố trước đây vẫn có
+  trong lịch sử Git.
 - Cấu hình được gộp theo thứ tự:
   1. `backend/config/default.toml`
   2. `backend/config/models.json`: manifest model do `run.bat` ghi, không commit.
