@@ -9,8 +9,9 @@ from dataclasses import dataclass
 
 import chess
 
-from ai.mcts.evaluation import estimated_white_reward, move_priority
-from ai.mcts.node import Node, backpropagate, robust_child
+from ai.mcts.evaluation import estimated_white_reward, move_priority, score_to_reward
+from ai.mcts.leaf import LeafEvaluator, LeafTimeout
+from ai.mcts.node import Node, backpropagate, backup_replies, release_tree, robust_child
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,8 @@ class SearchConfig:
     max_think_time_s: float = 1.0
     use_heuristics: bool = True
     claim_draw: bool = True
+    leaf_depth: int = -1
+    max_tree_nodes: int = 1024
 
 
 @dataclass(slots=True)
@@ -102,6 +105,10 @@ def search(
     seconds = config.max_think_time_s
     # Cooperative timing with a reserve, not an OS-level hard real-time guarantee.
     deadline = started + seconds * 0.97 if seconds > 0 else None
+    heuristic_leaf = config.use_heuristics and config.leaf_depth >= 0
+    evaluator = LeafEvaluator(
+        config.leaf_depth, deadline=deadline, clock=clock, claim_draw=config.claim_draw
+    )
     original = board.copy(stack=True)
     terminal = terminal_reward(original, claim_draw=config.claim_draw)
     if terminal is not None:
@@ -130,25 +137,46 @@ def search(
         for _ in range(config.simulations):
             if deadline is not None and clock() >= deadline:
                 break
-            simulation = original.copy(stack=True)
+            if nodes >= config.max_tree_nodes:
+                break
+            simulation = original
+            original_stack = len(simulation.move_stack)
             node, depth = root, 0
-            while not node.untried_moves and node.children:
-                node = node.select_child(config.exploration_constant)
-                simulation.push(node.move)
-                depth += 1
-                if deadline is not None and clock() >= deadline:
-                    break
-            if node.untried_moves and (deadline is None or clock() < deadline):
-                node = expand(node, simulation, rng, claim_draw=config.claim_draw)
-                nodes += 1
-                depth += 1
-            if node.terminal_white_reward is not None:
-                reward, cutoff, plies = node.terminal_white_reward, False, 0
-            else:
-                reward, cutoff, plies = rollout(
-                    simulation, config, rng, deadline=deadline, clock=clock
-                )
+            try:
+                while not node.untried_moves and node.children:
+                    node = (
+                        node.select_heuristic_child(config.exploration_constant)
+                        if heuristic_leaf
+                        else node.select_child(config.exploration_constant)
+                    )
+                    simulation.push(node.move)
+                    depth += 1
+                    if deadline is not None and clock() >= deadline:
+                        break
+                if node.untried_moves and (deadline is None or clock() < deadline):
+                    node = expand(node, simulation, rng, claim_draw=config.claim_draw)
+                    nodes += 1
+                    depth += 1
+                if node.terminal_white_reward is not None:
+                    reward, cutoff, plies = node.terminal_white_reward, False, 0
+                elif heuristic_leaf:
+                    reward = score_to_reward(evaluator.evaluate(simulation))
+                    cutoff, plies = True, 0
+                else:
+                    reward, cutoff, plies = rollout(
+                        simulation, config, rng, deadline=deadline, clock=clock
+                    )
+            except LeafTimeout:
+                break
+            except BaseException:
+                release_tree(root)
+                raise
+            finally:
+                while len(simulation.move_stack) > original_stack:
+                    simulation.pop()
             backpropagate(node, reward)
+            if heuristic_leaf:
+                backup_replies(node, reward)
             simulations += 1
             cutoffs += int(cutoff)
             rollout_plies += plies
@@ -173,5 +201,10 @@ def search(
         ],
         "shortcut": shortcut,
         "elapsed_s": clock() - started,
+        "leaf_nodes": evaluator.nodes,
+        "leaf_depth": config.leaf_depth if heuristic_leaf else -1,
+        "profile": "mcts-heuristic-b2" if heuristic_leaf else "mcts-rollout",
     }
+    release_tree(root)
+    info["elapsed_s"] = clock() - started
     return SearchResult(chosen, info)
