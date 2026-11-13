@@ -8,6 +8,8 @@ backend/config/local.toml
 
 # ---------- Trọng số mô hình (phát hành qua GitHub Release) ----------
 backend/ai/*/weights/
+# Checkpoint evolution của Genetic Alpha-Beta (chỉ giữ trên máy)
+backend/ai/genetic_alphabeta/evolution_checkpoint.json
 *.pt
 *.pth
 *.ckpt
