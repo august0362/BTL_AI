@@ -1,10 +1,24 @@
-"""Static board evaluation used by the Genetic Alpha-Beta bot."""
+"""Static board evaluation used by the Genetic Alpha-Beta bot.
+
+Material uses the fixed `PIECE_VALUES` shared with search; positional knowledge
+comes from the evolved genome (tapered piece-square tables plus structural
+terms). `game_phase` blends the midgame and endgame tables.
+"""
 
 from __future__ import annotations
 
 import chess
 
-from ai.genetic_alphabeta.genome import Genome
+from ai.genetic_alphabeta.genome import (
+    PIECE_VALUES,
+    PST_PIECE_TYPES,
+    PST_SLOT,
+    PST_SLOT_MIRROR,
+    Genome,
+)
+
+# Phase weights: knight/bishop 1, rook 2, queen 4; full material = 24.
+PHASE_MAX = 24
 
 CENTER_BB = 0
 for _file in range(2, 6):
@@ -197,36 +211,74 @@ def rook_open_score(board: chess.Board, color: chess.Color) -> float:
     return score
 
 
+def game_phase(board: chess.Board) -> float:
+    """Return 1.0 for a full midgame position and 0.0 for a bare endgame."""
+    phase = (board.knights | board.bishops).bit_count()
+    phase += 2 * board.rooks.bit_count()
+    phase += 4 * board.queens.bit_count()
+    return min(phase, PHASE_MAX) / PHASE_MAX
+
+
+def _pst_score(board: chess.Board, color: chess.Color, genome: Genome, phase: float) -> float:
+    """Tapered piece-square score of `color`'s pieces (White point of view slots)."""
+    slots = PST_SLOT_MIRROR if color == chess.BLACK else PST_SLOT
+    endgame_weight = 1.0 - phase
+    total = 0.0
+    for index, piece_type in enumerate(PST_PIECE_TYPES):
+        squares = board.pieces_mask(piece_type, color)
+        midgame_row = genome.pst_mg[index]
+        endgame_row = genome.pst_eg[index]
+        while squares:
+            low = squares & -squares
+            squares ^= low
+            slot = slots[low.bit_length() - 1]
+            total += midgame_row[slot] * phase + endgame_row[slot] * endgame_weight
+    return total
+
+
 def evaluate(board: chess.Board, genome: Genome) -> float:
     """Score the position in pawn units from White's perspective.
 
     The board is never mutated. Positive favors White, negative favors Black.
-    Doubled/isolated weights are positive magnitudes subtracted like penalties.
+    Material is fixed; the genome supplies tapered piece-square tables and the
+    structural terms, where doubled/isolated weights are positive magnitudes
+    subtracted like penalties. Structural terms whose gene is 0.0 are skipped,
+    so an untrained genome only pays for material and table lookups.
     """
     score = 0.0
     for piece_type in _MATERIAL_TYPES:
-        value = genome.piece_value(piece_type)
-        score += value * (
+        score += PIECE_VALUES[piece_type] * (
             board.pieces_mask(piece_type, chess.WHITE).bit_count()
             - board.pieces_mask(piece_type, chess.BLACK).bit_count()
         )
-    score += genome.center * (
-        (board.occupied_co[chess.WHITE] & CENTER_BB).bit_count()
-        - (board.occupied_co[chess.BLACK] & CENTER_BB).bit_count()
-    )
-    score += genome.mobility * (
-        mobility_count(board, chess.WHITE) - mobility_count(board, chess.BLACK)
-    )
-    score += genome.shield * (shield_count(board, chess.WHITE) - shield_count(board, chess.BLACK))
-    doubled, isolated, passed = structure_diffs(board)
-    score -= genome.doubled * doubled
-    score -= genome.isolated * isolated
-    score += genome.passed * passed
-    score += genome.bishop_pair * (
-        has_bishop_pair(board, chess.WHITE) - has_bishop_pair(board, chess.BLACK)
-    )
-    score += genome.rook_open * (
-        rook_open_score(board, chess.WHITE) - rook_open_score(board, chess.BLACK)
-    )
+    phase = game_phase(board)
+    score += _pst_score(board, chess.WHITE, genome, phase)
+    score -= _pst_score(board, chess.BLACK, genome, phase)
+    if genome.center:
+        score += genome.center * (
+            (board.occupied_co[chess.WHITE] & CENTER_BB).bit_count()
+            - (board.occupied_co[chess.BLACK] & CENTER_BB).bit_count()
+        )
+    if genome.mobility:
+        score += genome.mobility * (
+            mobility_count(board, chess.WHITE) - mobility_count(board, chess.BLACK)
+        )
+    if genome.shield:
+        score += genome.shield * (
+            shield_count(board, chess.WHITE) - shield_count(board, chess.BLACK)
+        )
+    if genome.doubled or genome.isolated or genome.passed:
+        doubled, isolated, passed = structure_diffs(board)
+        score -= genome.doubled * doubled
+        score -= genome.isolated * isolated
+        score += genome.passed * passed
+    if genome.bishop_pair:
+        score += genome.bishop_pair * (
+            has_bishop_pair(board, chess.WHITE) - has_bishop_pair(board, chess.BLACK)
+        )
+    if genome.rook_open:
+        score += genome.rook_open * (
+            rook_open_score(board, chess.WHITE) - rook_open_score(board, chess.BLACK)
+        )
     score += genome.tempo if board.turn == chess.WHITE else -genome.tempo
     return score
