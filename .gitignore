@@ -10,6 +10,8 @@ backend/config/local.toml
 backend/ai/*/weights/
 # Checkpoint evolution của Genetic Alpha-Beta (chỉ giữ trên máy)
 backend/ai/genetic_alphabeta/evolution_checkpoint.json
+# Kết quả benchmark, PGN, log và bản chụp mã nguồn: giữ trên máy
+backend/ai/*/results/
 *.pt
 *.pth
 *.ckpt
@@ -31,9 +33,13 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 build/
+dist/
+.eggs/
 .venv/
 venv/
 env/
+.tox/
+.nox/
 
 # ---------- Công cụ test / lint ----------
 .pytest_cache/
@@ -43,6 +49,9 @@ env/
 .coverage.*
 htmlcov/
 coverage.xml
+coverage.json
+*.log
+.pytest-tmp*/
 
 # ---------- IDE / hệ điều hành ----------
 .vscode/
@@ -54,14 +63,18 @@ desktop.ini
 
 # ---------- Bí mật ----------
 .env
+.env.*
+*.env
+!.env.example
+!.env.sample
+!*.env.example
+.kaggle/
 *.key
-.pytest-tmp*/
 .preview/
 
-# Linux run script & venv
+# Script Linux cá nhân
 run.sh
 test.sh
-.venv/
 
 DEEP_RL_DESIGN.md
 RL_LEARNING_GUIDE.md
@@ -69,9 +82,8 @@ RL_LEARNING_GUIDE.md
 android/
 
 
-# Documents
+# Tài liệu làm việc cá nhân
 documents/codex
-documents/images
 
 # Test log train Deep RL: chỉ để trên máy
 another/tests/ai/deep_rl/test_drill_log.py
@@ -83,8 +95,6 @@ backend/ai/benchmarks_extension/bench9/engine/
 # Công cụ đo sức mạnh Benchmark 9: chỉ để kiểm tra trên máy
 another/tools/bench9_strength.py
 
-AGENTS.md
-.png
 # run.bat: Python portable, manifest model đã áp dụng, file tải dở
 .runtime/
 backend/config/models.json

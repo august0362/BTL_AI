@@ -1,8 +1,0 @@
-{
-  "base_commit": "f16f85b374abf8a2ff20beebadaff93632c97ad3",
-  "screen_seed": 20261113,
-  "selection_seed": 20261201,
-  "final_confirmation_seed": 20261401,
-  "final_confirmation_games": 40,
-  "choice_rule": "Prefer captures-only if it wins all 20 selection games; otherwise compare depth-2; freeze before the 40 confirmation games. Report all completed W/D/L, including failures."
-}
