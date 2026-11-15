@@ -102,3 +102,4 @@ backend/config/models.json
 
 # Live Server: công cụ điều khiển server game (chứa token, chỉ để trên máy)
 live_server/
+Report

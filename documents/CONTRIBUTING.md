@@ -90,6 +90,12 @@ Không commit `database/data/`, `another/local_tools/`, `backend/config/local.to
 
 `pull.bat` cần working tree sạch: trên `main` thì fast-forward từ `origin/main`; trên branch công việc thì cập nhật branch rồi merge `origin/main`. Hủy merge đang xung đột: `git merge --abort`.
 
+## Cấu hình và model
+
+- Config gộp theo thứ tự: `backend/config/default.toml` → `backend/config/models.json` (manifest model do `run.bat` ghi, không commit) → `backend/config/local.toml` (tùy chỉnh trên máy, không commit).
+- Phát hành model: tạo release tag `models-vN` kèm các file `.pt` và `models.json` (xem mẫu `models-v1`, `format` = 1); `run.bat` của mọi người tự nhận bản mới ở lần chạy sau. Đổi cấu trúc manifest thì tăng `format` cùng `MODEL_FORMAT` trong `another/launcher.py`.
+- Kết quả benchmark, log, PGN trong `backend/ai/*/results/` chỉ giữ trên máy (gitignore).
+
 ## Tài liệu khác
 
-[CONTEXT.md](CONTEXT.md) (kiến trúc, hợp đồng) · [USER_GUIDE.md](USER_GUIDE.md) (cách chơi) · [BENCH9.md](BENCH9.md) (Benchmark 9) · [Deep RL](../backend/ai/deep_rl/README.md) (Option 4).
+[CONTEXT.md](CONTEXT.md) (kiến trúc, hợp đồng) · [USER_GUIDE.md](USER_GUIDE.md) (cách chơi) · [Deep RL](../backend/ai/deep_rl/README.md) (Option 4) · [CREDITS](../frontend/gui/assets/CREDITS.md).

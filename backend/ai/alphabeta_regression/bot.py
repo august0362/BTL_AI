@@ -1,10 +1,16 @@
 """Alpha-beta chess bot with a material-based linear-regression evaluator."""
 
+import time
+
 import chess
 
 from ai.alphabeta_regression.evaluate import evaluate
 from ai.alphabeta_regression.feature import extract_features
 from ai.base_bot import BaseBot
+
+
+class _OutOfTime(Exception):
+    """Raised inside the search when the per-move time budget runs out."""
 
 
 class AlphaBetaRegressionBot(BaseBot):
@@ -24,9 +30,40 @@ class AlphaBetaRegressionBot(BaseBot):
             configured_depth = default_depth
         self._depth = max(self._MIN_DEPTH, min(self._MAX_DEPTH, configured_depth))
         self._nodes = 0
+        try:
+            seconds = float(self.config.get("max_think_time_s", 0))
+        except (TypeError, ValueError):
+            seconds = 0.0
+        self._time_limit_s = seconds if seconds > 0 else None
+        self._deadline: float | None = None
 
     def select_move(self, board: chess.Board) -> chess.Move:
-        """Return the legal move with the best alpha-beta score."""
+        """Return the legal move with the best alpha-beta score.
+
+        With ``max_think_time_s`` > 0: iterative deepening 1 -> depth, keeping the deepest
+        search that finished in time (depth 1 always finishes).
+        """
+        if self._time_limit_s is None:
+            return self._search(board, self._depth)
+        started = time.perf_counter()
+        best = self._search(board, 1)
+        info = dict(self.last_search_info)
+        self._deadline = started + self._time_limit_s * 0.9
+        try:
+            for depth in range(2, self._depth + 1):
+                if time.perf_counter() >= self._deadline:
+                    break
+                best = self._search(board.copy(), depth)
+                info = dict(self.last_search_info)
+        except _OutOfTime:
+            pass
+        finally:
+            self._deadline = None
+        self.last_search_info = info
+        return best
+
+    def _search(self, board: chess.Board, search_depth: int) -> chess.Move:
+        """Full-width alpha-beta at ``search_depth`` plies."""
         moves = self._ordered_moves(board)
         if not moves:
             raise ValueError("Cannot select a move from a board without legal moves")
@@ -42,7 +79,7 @@ class AlphaBetaRegressionBot(BaseBot):
             board.push(move)
             score = self._alpha_beta(
                 board,
-                self._depth - 1,
+                search_depth - 1,
                 alpha,
                 beta,
                 root_color,
@@ -55,7 +92,7 @@ class AlphaBetaRegressionBot(BaseBot):
             alpha = max(alpha, best_score)
 
         self.last_search_info = {
-            "depth": self._depth,
+            "depth": search_depth,
             "nodes": self._nodes,
             "eval": max(-1.0, min(1.0, best_score)),
         }
@@ -70,6 +107,9 @@ class AlphaBetaRegressionBot(BaseBot):
         root_color: chess.Color,
     ) -> float:
         self._nodes += 1
+        if self._deadline is not None and self._nodes % 32 == 0:
+            if time.perf_counter() > self._deadline:
+                raise _OutOfTime
         if depth == 0 or board.is_game_over():
             return evaluate(extract_features(board), root_color)
 

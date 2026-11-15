@@ -142,8 +142,20 @@ class App:
         return overrides
 
     def _bot_config(self, bot_id: str) -> dict[str, Any]:
-        """Return a bot-specific configuration table."""
-        return get_bot_config(self.config, bot_id)
+        """Return a bot-specific configuration table.
+
+        ``[game] max_think_time_s`` > 0 caps every bot's time per move (overrides the bot's own
+        value); 0 leaves each bot's ``[bots.<id>]`` setting.
+        """
+        bot_config = get_bot_config(self.config, bot_id)
+        game = self.config.get("game", {})
+        try:
+            seconds = float(game.get("max_think_time_s", 0)) if isinstance(game, dict) else 0.0
+        except (TypeError, ValueError):
+            seconds = 0.0
+        if seconds > 0:
+            bot_config = {**bot_config, "max_think_time_s": seconds}
+        return bot_config
 
     def _localized_bot_name(self, bot_id: str) -> str:
         """Return a localized bot name (no "(baseline)" marker)."""

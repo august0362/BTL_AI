@@ -124,10 +124,8 @@ class V20RampPolicy:
     """MCTS with the START/MID net while G > ``end_g``; afterwards the END net is picked with a
     probability that grows ``1/ramp_moves`` per own move (§7.1).
 
-    The search evaluates ``batch_size`` leaves per forward pass, runs up to ``simulations`` new
-    simulations per move and may keep its subtree for up to ``tree_reuse`` plies; ``widening``
-    and ``early_stop`` are described in ``batched.TreeSearch``. A positive
-    ``max_think_time_s`` also limits the search time per move.
+    The search builds a fresh tree every move and runs up to ``simulations`` simulations; a
+    positive ``max_think_time_s`` also limits the search time per move (``tree.TreeSearch``).
     """
 
     def __init__(
@@ -138,25 +136,13 @@ class V20RampPolicy:
         end_g: int = END_G,
         ramp_moves: int = 10,
         seed: int | None = None,
-        batch_size: int = 32,
-        tree_reuse: int = 0,
-        widening: bool = False,
-        early_stop: bool = False,
         max_think_time_s: float = 0.0,
     ) -> None:
-        from .batched import TreeSearch
+        from .tree import TreeSearch
 
         if ramp_moves < 1:
             raise ValueError("ramp_moves must be positive")
-        self.tree = TreeSearch(
-            device,
-            simulations,
-            batch_size,
-            tree_reuse,
-            widening=widening,
-            early_stop=early_stop,
-            max_think_time_s=max_think_time_s,
-        )
+        self.tree = TreeSearch(device, simulations, max_think_time_s=max_think_time_s)
         self.models = models
         self.simulations = simulations
         self.end_g = end_g
@@ -169,7 +155,7 @@ class V20RampPolicy:
         p_end = end_probability(end_moves(board, self.end_g), self.ramp_moves)
         net = "end" if self.rng.random() < p_end else "mid"
         gamma = END_GAMMA if net == "end" else 1.0
-        moves, visits, q, nodes, reused = self.tree.run(board, self.models[net], gamma)
+        moves, visits, q, nodes = self.tree.run(board, self.models[net], gamma)
         best = int(visits.argmax())
         if not visits.any():
             assert self.tree.root is not None and self.tree.root.prior is not None
@@ -180,7 +166,6 @@ class V20RampPolicy:
             "p_end": p_end,
             "simulations": self.simulations,
             "nodes": nodes,
-            "reused": reused,
             "eval": float(q[best]),
             **self.tree.stats,
         }
@@ -196,19 +181,14 @@ def load_v20_policy(
     max_think_time_s: float = 1.0,
     end_g: int = END_G,
     ramp_moves: int = 10,
-    batch_size: int = 32,
-    tree_reuse: int = 0,
-    widening: bool = False,
-    early_stop: bool = False,
 ) -> V20Policy | V20AlphaBetaPolicy | V20HybridPolicy | V20RampPolicy:
     """Validate packed V20 weights and strictly load all three phase experts.
 
     ``search = "mcts"`` plays ``simulations`` PUCT visits per move; ``"alphabeta"`` plays
     alpha-beta to ``depth`` within ``max_think_time_s`` seconds; ``"hybrid"`` plays alpha-beta
     in START/MID and MCTS in END; ``"ramp"`` plays MCTS and moves from the MID net to the END net
-    over ``ramp_moves`` own moves once G <= ``end_g``, batching ``batch_size`` leaves per forward
-    pass, reusing the subtree for up to ``tree_reuse`` plies, with optional progressive
-    ``widening`` and ``early_stop`` (§7.1), within ``max_think_time_s`` seconds (0 = unlimited).
+    over ``ramp_moves`` own moves once G <= ``end_g`` (§7.1), within ``max_think_time_s``
+    seconds (0 = unlimited).
     """
     from .model import PolicyValueNet
 
@@ -240,10 +220,6 @@ def load_v20_policy(
             end_g,
             ramp_moves,
             None,
-            batch_size,
-            tree_reuse,
-            widening,
-            early_stop,
             max_think_time_s=max_think_time_s,
         )
     from .alphabeta import V20AlphaBetaPolicy

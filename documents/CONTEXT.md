@@ -65,7 +65,7 @@ BTL_AI/
 ├── frontend/gui/      # ứng dụng Pygame: màn hình, widget, locales, assets
 ├── frontend/resource/ # bảng màu, tài nguyên giao diện
 ├── database/data/     # lịch sử, xếp hạng tạo khi chơi (.gitignore)
-├── documents/         # CONTEXT, CONTRIBUTING, USER_GUIDE, BENCH9
+├── documents/         # CONTEXT, CONTRIBUTING, USER_GUIDE
 ├── environments/      # .python-version, requirements.txt, requirements-dev.txt
 ├── another/           # local_tools/ (.gitignore), scripts/ (Windows), tests/, tools/
 ├── .github/           # workflow, CODEOWNERS, mẫu PR
@@ -329,7 +329,7 @@ Mỗi ván đơn lẻ là một mục; ván trong Best of 3 có `series_id`/`ser
 | `bench6_gpt` / `_gemini` / `_deepseek` | B6 · … | Engine PVS chọn lọc (§4.9.2), mỗi bản chỉ theo một file (bản B6) |
 | `bench7` | B7 · Dragon | Tổng hợp 4 thiết kế B6, chọn bằng ablation |
 | `bench8_luna` | B8 · Luna | Lõi Dragon + SEE theo ngưỡng; các phương án khác có công tắc, mặc định tắt (§4.9.3) |
-| `bench_super_alphabeta_nnue` | B9 · Super Alpha-Beta NNUE | **Engine kế thừa:** Stockfish 19 chính thức (GPLv3, NNUE nhúng) qua UCI, 1 luồng, trong trần thời gian (§4.9.5, `documents/BENCH9.md`) |
+| `bench_super_alphabeta_nnue` | B9 · Super Alpha-Beta NNUE | **Engine kế thừa:** Stockfish 19 chính thức (GPLv3, NNUE nhúng) qua UCI, 1 luồng, trong trần thời gian (§4.9.5) |
 
 **B1–B4** (`backend/ai/benchmarks/`):
 
@@ -399,7 +399,7 @@ Khác B5–B8: **không tự viết engine**, mà chạy Stockfish 19 chính th�
 - Lỗi khởi tạo (thiếu binary, sai kiến trúc, NNUE hỏng — kiểm bằng `go depth 1` lúc khởi động) → `BotUnavailableError`. Lỗi giữa ván → khởi động lại 1 lần, nước đó gắn `fallback`; vẫn hỏng → `RuntimeError` (ván hủy), không bao giờ đi ngẫu nhiên.
 - `threads = 1` (công bằng với bot Python, tất định), `hash_mb = 16`; tùy chọn `engine_path`/`BENCH9_ENGINE_PATH`, `nnue_path`, `syzygy_path`.
 - `tournament.process_player` cộng `bot.external_memory_bytes()` (đỉnh RAM tiến trình Stockfish, ~230–330 MB) vào cột Bộ nhớ rồi gọi `bot.close()`.
-- Kết quả (1 s/nước, khai cuộc 2 nửa nước ghép cặp đổi màu, tối đa 150 nửa nước): xem `documents/BENCH9.md` — B9 thắng 400/400 ván trước B7 và B8 (cận dưới Elo 95 % ≈ +729), mọi ván kết thúc bằng chiếu hết, không ván nào chạm mốc 150. Không huấn luyện NNUE riêng.
+- Kết quả (1 s/nước, khai cuộc 2 nửa nước ghép cặp đổi màu, tối đa 150 nửa nước): B9 thắng 400/400 ván trước B7 và B8 (cận dưới Elo 95 % ≈ +729), mọi ván kết thúc bằng chiếu hết, không ván nào chạm mốc 150. Không huấn luyện NNUE riêng.
 
 #### 4.9.4 Giải vòng tròn (`backend/tournament/`)
 
@@ -760,7 +760,7 @@ def get_bot_config(config, bot_id) -> dict: ...      # config["bots"][bot_id] ho
 
 ## 7. Option 4 — Deep RL (`backend/ai/deep_rl/`)
 
-- **PyTorch**, huấn luyện trên **Kaggle** (CPU/GPU), suy luận trên **CPU** trong game. Board encoding nằm **bên trong** package. `import torch` **lười** trong bot. Lịch sử v1 → V22: `backend/ai/deep_rl/DEEP_RL_EVOLUTION.md`; cách dùng: `backend/ai/deep_rl/README.md`.
+- **PyTorch**, huấn luyện trên **Kaggle** (CPU/GPU), suy luận trên **CPU** trong game. Board encoding nằm **bên trong** package. `import torch` **lười** trong bot. Lịch sử v1 → V22X: `backend/ai/deep_rl/DEEP_RL_EVOLUTION.md`; cách dùng: `backend/ai/deep_rl/README.md`.
 - Trọng số: checkpoint train ở Kaggle; bản tốt nhất lên **GitHub Release** (tag `deeprl-vX.Y`); lần đầu bot tự tải về `backend/ai/deep_rl/weights/` (gitignored) và kiểm `sha256` — không mạng/sai checksum → `BotUnavailableError`.
 - Elo **không phải** reward (reward do Option 4 tự thiết kế; Elo chỉ để đánh giá).
 - CI thiếu trọng số: test hợp đồng dùng mô hình khởi tạo ngẫu nhiên (`allow_random_init`). Không có torch (vd Android) → registry báo bot không khả dụng.
