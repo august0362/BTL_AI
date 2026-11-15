@@ -1,0 +1,10 @@
+{
+  "repository_commit": "f16f85b374abf8a2ff20beebadaff93632c97ad3",
+  "source_sha256": {
+    "evaluation.py": "cc3c5983d35c67c91b3704fe8e065d0c4b009cf71a363648f30f41fb4093380c",
+    "bot.py": "a0311a5a2caeb4bd57cffe488ca808a39121aa9b628a749989cd5e2390aa8579",
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "search.py": "798677739050fd03f7c297c8e6c5b68ae5fef730dce3cd24778b450de2d60215",
+    "node.py": "e0905703abfe5416198a47f0aa0dc60e0dbe43941ca8100de25e0cf1e8ae28be"
+  }
+}

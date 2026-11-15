@@ -70,10 +70,6 @@ def load_policy(
     search: str = "mcts",
     end_g: int = 4,
     ramp_moves: int = 10,
-    batch_size: int = 32,
-    tree_reuse: int = 0,
-    widening: bool = False,
-    early_stop: bool = False,
 ) -> Policy:
     """Nạp trọng số; chưa có trọng số thì báo ``NotImplementedError`` để bot đi ngẫu nhiên.
 
@@ -83,9 +79,8 @@ def load_policy(
     ba mạng START/MID/END theo pha; ``search = "mcts"`` chạy MCTS ``simulations`` lượt,
     ``"alphabeta"`` chạy alpha-beta độ sâu ``depth`` với điểm lá là Value của mạng (§7.1).
     ``"ramp"`` chạy MCTS: mạng MID khi G > ``end_g``, sau đó xác suất dùng mạng END tăng
-    ``1/ramp_moves`` mỗi nước của mình, gom ``batch_size`` lá mỗi lượt gọi mạng, chạy tối đa
-    ``simulations`` lượt mới mỗi nước, giữ lại cây tối đa ``tree_reuse`` ply, tùy chọn
-    ``widening`` (progressive widening) và ``early_stop``. File DQN/V11 bỏ qua ``search``.
+    ``1/ramp_moves`` mỗi nước của mình, dựng cây mới và chạy tối đa ``simulations`` lượt mỗi
+    nước. File DQN/V11 bỏ qua ``search``.
     """
     if weights_path is None:
         raise NotImplementedError("deep_rl chưa có trọng số (weights_url trống)")
@@ -106,10 +101,6 @@ def load_policy(
             max_think_time_s,
             end_g,
             ramp_moves,
-            batch_size,
-            tree_reuse,
-            widening,
-            early_stop,
         )
     if data.get("format") != WEIGHTS_FORMAT:
         raise ValueError(f"file trọng số không đúng định dạng {WEIGHTS_FORMAT}")

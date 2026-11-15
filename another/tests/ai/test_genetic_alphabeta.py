@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 import math
 import random
+import sys
 from pathlib import Path
 
 import chess
@@ -238,3 +240,120 @@ def test_bot_allows_an_empty_genome_for_tests(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(bot_module, "WEIGHTS_FILENAME", "missing_weights.json")
     bot = bot_module.GeneticAlphaBetaBot({"fast_mode": True, "allow_random_init": True, "seed": 0})
     assert bot.select_move(chess.Board()) in chess.Board().legal_moves
+
+
+def test_evolve_starts_from_the_incumbent_genome() -> None:
+    """A fresh run seeds the population from the saved genome instead of zero."""
+    incumbent = random_genome(random.Random(3))
+    assert evolution.evolve(generations=0, incumbent=incumbent) == incumbent
+
+
+def test_evolve_saves_an_accepted_champion_before_the_run_ends(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An accepted generation lands on the weights file immediately, not only at the end."""
+    weights = tmp_path / WEIGHTS_FILENAME
+    incumbent = random_genome(random.Random(4))
+    file_exists_when_ranking: list[bool] = []
+
+    def fake_fitness(*args: object, **kwargs: object) -> float:
+        file_exists_when_ranking.append(weights.is_file())
+        return 0.0
+
+    monkeypatch.setattr(evolution, "fitness", fake_fitness)
+    monkeypatch.setattr(
+        evolution, "match", lambda *args, **kwargs: evolution.MatchResult((1.0, 1.0))
+    )
+    best = evolution.evolve(
+        pop_size=2,
+        generations=2,
+        seed=1,
+        checkpoint_path=tmp_path / "checkpoint.json",
+        incumbent=incumbent,
+        weights_path=weights,
+    )
+    assert weights.is_file()
+    assert load_genome(weights) == best
+    assert file_exists_when_ranking[0] is False
+    assert file_exists_when_ranking[-1] is True
+
+
+def test_evolve_never_truncates_weights_without_an_accepted_champion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run that accepts nothing leaves the saved weights byte-identical."""
+    weights = save_genome(random_genome(random.Random(6)), tmp_path / WEIGHTS_FILENAME)
+    sentinel = load_genome(weights)
+    monkeypatch.setattr(
+        evolution, "match", lambda *args, **kwargs: evolution.MatchResult((0.0, 0.0))
+    )
+    best = evolution.evolve(
+        pop_size=2,
+        generations=1,
+        seed=2,
+        checkpoint_path=tmp_path / "checkpoint.json",
+        incumbent=sentinel,
+        weights_path=weights,
+    )
+    assert best == sentinel
+    assert load_genome(weights) == sentinel
+
+
+def test_load_saved_genome_ignores_missing_and_broken_files(tmp_path: Path) -> None:
+    """A missing or corrupt weights file falls back to training from scratch."""
+    assert evolution._load_saved_genome(tmp_path / "absent.json") is None
+    broken = tmp_path / "broken.json"
+    broken.write_text("{not json", encoding="utf-8")
+    assert evolution._load_saved_genome(broken) is None
+    good = save_genome(random_genome(random.Random(8)), tmp_path / WEIGHTS_FILENAME)
+    assert evolution._load_saved_genome(good) == load_genome(good)
+
+
+def test_safe_print_survives_a_legacy_console_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Vietnamese progress labels must not crash when stdout uses a legacy code page."""
+    buffer = io.BytesIO()
+    stream = io.TextIOWrapper(buffer, encoding="cp1252", newline="")
+    monkeypatch.setattr(sys, "stdout", stream)
+    evolution._safe_print("thế hệ 1")
+    evolution._safe_print("hết", end="")
+    stream.flush()
+    assert buffer.getvalue() == b"th? h? 1\nh?t"
+
+
+def test_main_trains_on_the_saved_genome_by_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The CLI feeds weights.json back into training instead of restarting from zero."""
+    saved = save_genome(random_genome(random.Random(12)), tmp_path / WEIGHTS_FILENAME)
+    current = load_genome(saved)
+    captured: dict[str, object] = {}
+
+    def fake_evolve(**kwargs: object) -> Genome:
+        captured.update(kwargs)
+        return current
+
+    monkeypatch.setattr(evolution, "__file__", str(tmp_path / "evolution.py"))
+    monkeypatch.setattr(evolution, "evolve", fake_evolve)
+    monkeypatch.setattr(sys, "argv", ["evolution"])
+    evolution.main()
+    assert captured["incumbent"] == current
+    assert captured["weights_path"] == saved
+    assert captured["seed"] is None
+    assert load_genome(saved) == current
+
+
+def test_main_does_not_downgrade_weights_after_a_stale_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resume that wins nothing must not overwrite newer weights with the checkpoint."""
+    saved = save_genome(random_genome(random.Random(21)), tmp_path / WEIGHTS_FILENAME)
+    current = load_genome(saved)
+
+    def fake_evolve(**kwargs: object) -> Genome:
+        return random_genome(random.Random(22))
+
+    monkeypatch.setattr(evolution, "__file__", str(tmp_path / "evolution.py"))
+    monkeypatch.setattr(evolution, "evolve", fake_evolve)
+    monkeypatch.setattr(sys, "argv", ["evolution", "--resume"])
+    evolution.main()
+    assert load_genome(saved) == current

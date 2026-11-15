@@ -9,10 +9,14 @@ opening suite, so scores are comparable: each opening is played twice with the
 colours swapped. A generation champion only replaces the incumbent when the
 one-sided 95 % lower bound of its score edge is above zero.
 
+A fresh run starts from the genome already saved in ``weights.json``, and every
+accepted generation is written straight back to it, so a run that is stopped
+early still keeps the knowledge it has earned.
+
 Commands::
 
     python -m ai.genetic_alphabeta.evolution              # train, save weights.json
-    python -m ai.genetic_alphabeta.evolution --resume     # continue from checkpoint
+    python -m ai.genetic_alphabeta.evolution --resume --generations 20   # keep training
     python -m ai.genetic_alphabeta.evolution --verify     # evolved vs empty genome
 """
 
@@ -23,6 +27,7 @@ import json
 import math
 import random
 import statistics
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -140,10 +145,23 @@ class MatchResult:
         return self.score - 0.5 - CONFIDENCE_Z * spread
 
 
+def _safe_print(text: str = "", end: str = "\n") -> None:
+    """Print without dying when the console code page cannot encode Vietnamese.
+
+    Redirected stdout keeps the legacy Windows code page, where labels such as
+    ``thế hệ`` raise `UnicodeEncodeError`; fall back to a lossy copy of the text.
+    """
+    try:
+        print(text, end=end, flush=True)
+    except UnicodeEncodeError:
+        encoding = sys.stdout.encoding or "ascii"
+        print(text.encode(encoding, "replace").decode(encoding), end=end, flush=True)
+
+
 def _show_progress(label: str, done: int, total: int) -> None:
     """Print one updating progress line when a label is given."""
     if label:
-        print(f"\r{label}: ván {done}/{total}", end="", flush=True)
+        _safe_print(f"\r{label}: ván {done}/{total}", end="")
 
 
 def match(
@@ -163,7 +181,7 @@ def match(
         paired.append((as_white + as_black) / 2.0)
         _show_progress(label, 2 * done, total)
     if label:
-        print()
+        _safe_print()
     return MatchResult(tuple(paired))
 
 
@@ -211,6 +229,17 @@ def load_checkpoint(path: Path) -> Checkpoint:
     return Checkpoint(generation=int(data["generation"]), best=Genome.from_dict(data["best"]))
 
 
+def _load_saved_genome(path: Path) -> Genome | None:
+    """Return the genome saved at `path`, or None when it is missing or unreadable."""
+    if not path.is_file():
+        return None
+    try:
+        return load_genome(path)
+    except ValueError as exc:
+        _safe_print(f"Bỏ qua {path.name} không đọc được: {exc}")
+        return None
+
+
 def _pick_parent(scored: list[tuple[float, Genome]], rng: random.Random) -> Genome:
     """Tournament-pick one parent genome from scored (fitness, genome) pairs."""
     contenders = rng.sample(scored, min(3, len(scored)))
@@ -228,6 +257,8 @@ def evolve(
     resume: bool = False,
     checkpoint_path: Path | None = None,
     max_plies: int = MAX_PLIES,
+    incumbent: Genome | None = None,
+    weights_path: Path | None = None,
 ) -> Genome:
     """Run tournament selection + uniform crossover + mutation; return the champion.
 
@@ -235,16 +266,27 @@ def evolve(
     incumbent champion) and the paired-opening suite. The champion of the
     generation replaces the incumbent only when the one-sided 95 % lower bound
     of its edge over the incumbent clears zero on a fresh opening suite.
+
+    `incumbent` seeds a fresh run with the genome already on disk instead of the
+    empty one, and `weights_path` stores every accepted champion immediately, so
+    an interrupted run keeps the knowledge it has already earned.
     """
     rng = random.Random(seed)
     checkpoint_file = checkpoint_path or Path(__file__).with_name(CHECKPOINT_FILENAME)
-    best = DEFAULT_GENOME
+    best = DEFAULT_GENOME if incumbent is None else incumbent
     first_generation = 1
     if resume and checkpoint_file.is_file():
         checkpoint = load_checkpoint(checkpoint_file)
         best = checkpoint.best
         first_generation = checkpoint.generation + 1
-        print(f"Tiếp tục từ thế hệ {checkpoint.generation} ({checkpoint_file})")
+        _safe_print(f"Tiếp tục từ thế hệ {checkpoint.generation} ({checkpoint_file})")
+        if first_generation > generations:
+            _safe_print(
+                f"Checkpoint đã ở thế hệ {checkpoint.generation}: cần --generations lớn hơn "
+                f"{checkpoint.generation} mới có thế hệ để luyện tiếp"
+            )
+    elif incumbent is not None:
+        _safe_print("Khởi tạo quần thể từ genome đã lưu trên đĩa")
     population = [best, *(random_genome(rng) for _ in range(max(0, pop_size - 1)))]
     for generation in range(first_generation, generations + 1):
         openings = opening_suite(rng, openings_per_opponent)
@@ -265,13 +307,17 @@ def evolve(
             f"thế hệ {generation} · kiểm định",
         )
         accepted = validation.lower_bound > 0.0
+        stored = ""
         if accepted:
             best = challenger
-        print(
+            if weights_path is not None:
+                save_genome(best, weights_path)
+                stored = f" → đã lưu {weights_path.name}"
+        _safe_print(
             f"thế hệ {generation}: luyện={scored[0][0]:.3f} "
             f"kiểm định={validation.score:.3f} "
             f"(cận dưới {validation.lower_bound:+.3f}) "
-            f"{'nhận' if accepted else 'giữ'}"
+            f"{'nhận' if accepted else 'giữ'}{stored}"
         )
         save_checkpoint(Checkpoint(generation, best), checkpoint_file)
         next_pop = [genome for _, genome in scored[: max(2, elite)]]
@@ -293,7 +339,7 @@ def verify(
     genome = load_genome(weights_path)
     openings = opening_suite(random.Random(seed), paired_openings)
     result = match(genome, DEFAULT_GENOME, openings, depth, max_plies, "kiểm tra vs genome 0")
-    print(
+    _safe_print(
         f"Genome đã tiến hóa vs genome 0: {result.score:.3f} "
         f"trên {result.games} ván (cận dưới {result.lower_bound:+.3f})"
     )
@@ -305,7 +351,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evolve Genetic Alpha-Beta weights.")
     parser.add_argument("--pop", type=int, default=12)
     parser.add_argument("--generations", type=int, default=6)
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="fixed seed so a run is reproducible; omit for a fresh run every time",
+    )
     parser.add_argument("--depth", type=int, default=GAME_DEPTH)
     parser.add_argument(
         "--openings",
@@ -320,7 +371,11 @@ def main() -> None:
         help="paired openings of the acceptance match (40 games by default)",
     )
     parser.add_argument("--elite", type=int, default=2)
-    parser.add_argument("--resume", action="store_true", help="continue from the checkpoint")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="continue from the checkpoint (--generations must exceed its generation)",
+    )
     parser.add_argument(
         "--verify",
         action="store_true",
@@ -329,8 +384,10 @@ def main() -> None:
     args = parser.parse_args()
     weights_file = Path(__file__).with_name(WEIGHTS_FILENAME)
     if args.verify:
-        verify(weights_file, args.depth, args.validation, args.seed)
+        verify_seed = 0 if args.seed is None else args.seed
+        verify(weights_file, args.depth, args.validation, verify_seed)
         return
+    before = _load_saved_genome(weights_file)
     best = evolve(
         pop_size=args.pop,
         generations=args.generations,
@@ -340,12 +397,18 @@ def main() -> None:
         validation_openings=args.validation,
         elite=args.elite,
         resume=args.resume,
+        incumbent=before,
+        weights_path=weights_file,
     )
-    if best == DEFAULT_GENOME and weights_file.is_file():
-        print("Không genome nào vượt kiểm định — giữ nguyên weights.json hiện tại")
+    # `evolve` stores every accepted champion, so the file itself says whether this
+    # run earned anything. Comparing genomes would let a `--resume` from an older
+    # checkpoint overwrite newer weights that were never beaten.
+    after = _load_saved_genome(weights_file) if weights_file.is_file() else None
+    if before is not None and after == before:
+        _safe_print("Không genome nào vượt kiểm định — giữ nguyên weights.json hiện tại")
         return
     path = save_genome(best, weights_file)
-    print(f"Đã lưu genome vào {path}")
+    _safe_print(f"Đã lưu genome vào {path}")
 
 
 if __name__ == "__main__":

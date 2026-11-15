@@ -10,6 +10,8 @@ fps = 120
 random_opening_plies = 2   # chỉ Bot vs Bot. Đơn vị: nửa nước (2 = mỗi bên 1 nước)
 max_plies = 300            # quá số nửa nước này thì xử hòa
 claim_draw = true          # tự hòa khi lặp 3 lần / luật 50 nước
+max_think_time_s = 1.0     # giây mỗi nước cho MỌI bot (Người vs Bot, Bot vs Bot), đè lên [bots.<id>];
+                           # 0 = mỗi bot dùng thời gian riêng của nó. Bảng xếp hạng AI dùng [tournament].
 
 [ranking]
 elo_initial = 1200

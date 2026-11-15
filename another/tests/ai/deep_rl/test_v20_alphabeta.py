@@ -145,125 +145,23 @@ def test_ramp_policy_uses_mid_before_threshold_and_end_after_ramp() -> None:
     assert player.last_info["phase"] == "end" and player.last_info["mode"] == "ramp"
 
 
-def test_batched_search_matches_plain_search_and_reuses_subtree() -> None:
+def test_tree_search_matches_plain_search_and_starts_fresh_each_move() -> None:
     import numpy as np
 
-    from ai.deep_rl.v20.batched import TreeSearch
     from ai.deep_rl.v20.search import search
+    from ai.deep_rl.v20.tree import TreeSearch
 
     torch.manual_seed(0)
     model = PolicyValueNet(**_TINY_CONFIG).eval()
     board = chess.Board()
     plain = search(board, model, "cpu", 24, gamma=0.995)
-    single = TreeSearch("cpu", 24, batch_size=1).run(board, model, 0.995)
-    assert np.array_equal(plain[1], single[1]) and np.allclose(plain[2], single[2])
-
-    tree = TreeSearch("cpu", 64, batch_size=8, max_reuse=2)
-    moves, visits, _q, _nodes, reused = tree.run(board, model)
-    assert reused == 0 and visits.sum() == 64
-    best = int(visits.argmax())
-    board.push(moves[best])
-    reply = tree.root.children[best]
-    board.push(reply.moves[int(reply.visits.argmax())])  # the opponent's most searched reply
-    _moves, visits, _q, _nodes, reused = tree.run(board, model)
-    assert reused > 0 and visits.sum() == reused + 64  # 64 NEW simulations on top
-    assert tree.stats["new_simulations"] == 64 and tree.stats["reused_root_visits"] == reused
-    board.push(next(iter(board.legal_moves)))
-    board.push(next(iter(board.legal_moves)))
-    assert tree.run(board, model)[4] == 0  # 4 plies > max_reuse = 2: fresh tree
-
-
-def _tiny_model(seed: int = 0) -> PolicyValueNet:
-    torch.manual_seed(seed)
-    return PolicyValueNet(**_TINY_CONFIG).eval()
-
-
-def _check_tree(node) -> None:
-    """Virtual loss is fully undone: edge visits cover the child's visits, Q stays in [-1, 1]."""
-    import numpy as np
-
-    assert (node.visits >= 0).all()
-    assert (np.abs(node.sums) <= node.visits + 1e-9).all()
-    for index, child in node.children.items():
-        if child.expanded:
-            assert node.visits[index] >= child.visits.sum() + 1
-            _check_tree(child)
-
-
-def test_batched_search_resets_on_model_or_gamma_change_and_cleans_virtual_loss() -> None:
-    from ai.deep_rl.v20.batched import TreeSearch
-
-    first, second = _tiny_model(0), _tiny_model(1)
-    tree = TreeSearch("cpu", 96, batch_size=16, max_reuse=10)
-    board = chess.Board()
-    for model, gamma in ((first, 1.0), (second, 1.0), (second, 0.995)):
-        moves, visits, _q, _nodes, reused = tree.run(board, model, gamma)
-        assert reused == 0 and visits.sum() == 96
-        _check_tree(tree.root)
-        best = int(visits.argmax())
-        board.push(moves[best])
-        reply = tree.root.children[best]
-        board.push(reply.moves[int(reply.visits.argmax())])
-    _moves, visits, _q, _nodes, reused = tree.run(board, second, 0.995)
-    assert reused > 0 and visits.sum() == reused + 96
-    _check_tree(tree.root)
-
-
-def test_widen_limit_and_forcing_moves_stay_eligible() -> None:
-    import numpy as np
-
-    from ai.deep_rl.v20.batched import _mark_widening, widen_limit
-    from ai.deep_rl.v20.search import Node
-
-    assert widen_limit(0, 30) == 10 and widen_limit(100, 30) == 20
-    assert widen_limit(400, 30) == 30 and widen_limit(0, 5) == 5
-    board = chess.Board("4k3/8/8/8/3p4/8/8/R3K3 w - - 0 1")
-    node = Node(board.turn, moves=list(board.legal_moves))
-    tactical = [board.is_capture(m) or board.gives_check(m) for m in node.moves]
-    node.prior = np.where(tactical, 1e-6, 1.0)  # forcing moves ranked last by the policy
-    _mark_widening(node, board)
-    assert node.forced.tolist() == tactical and any(tactical)
-    check = chess.Board("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1")
-    node = Node(check.turn, moves=list(check.legal_moves))
-    node.prior = np.ones(len(node.moves))
-    _mark_widening(node, check)
-    assert node.forced.all()
-
-
-def test_widening_limits_root_to_policy_top_k() -> None:
-    import math
-
-    import numpy as np
-
-    from ai.deep_rl.v20.batched import TreeSearch
-
-    tree = TreeSearch("cpu", 64, batch_size=8, widening=True)
-    board = chess.Board()  # 20 quiet moves, none forcing
-    _moves, visits, _q, _nodes, _reused = tree.run(board, _tiny_model())
-    allowed = math.ceil(2 * math.sqrt(63))
-    ranked = np.argsort(-tree.root.prior, kind="stable")
-    assert visits.sum() == 64 and (visits[ranked[allowed:]] == 0).all()
-    _check_tree(tree.root)
-
-
-def test_early_stop_only_when_best_move_cannot_be_overtaken() -> None:
-    from ai.deep_rl.v20.batched import TreeSearch
-
-    model = _tiny_model()
-    only_move = chess.Board("k7/8/8/8/8/8/1q6/K7 w - - 0 1")  # Kxb2 is forced, then a draw
-    tree = TreeSearch("cpu", 1000, batch_size=32, early_stop=True)
-    _moves, visits, _q, _nodes, _reused = tree.run(only_move, model)
-    assert tree.stats["new_simulations"] == 512 == visits.sum()
-    assert tree.stats["early_stop_reason"] == "best_move_unreachable"
-
-    board = chess.Board()
-    full = TreeSearch("cpu", 600, batch_size=32).run(board, model)
-    early = TreeSearch("cpu", 600, batch_size=32, early_stop=True)
-    moves, visits, _q, _nodes, _reused = early.run(board, model)
-    assert moves[int(visits.argmax())] == full[0][int(full[1].argmax())]
-    done = early.stats["new_simulations"]
-    if done < 600:
-        top = sorted(visits)[-2:]
-        assert done >= 256 and top[1] > top[0] + 600 - done
+    tree = TreeSearch("cpu", 24)
+    moves, visits, q, nodes = tree.run(board, model, 0.995)
+    assert moves == plain[0] and np.array_equal(visits, plain[1]) and np.allclose(q, plain[2])
+    assert nodes == plain[3] == 25 and tree.stats["new_simulations"] == 24
+    assert tree.stats["stop_reason"] is None
+    board.push(moves[int(visits.argmax())])
+    _moves, visits, _q, _nodes = tree.run(board, model)
+    assert visits.sum() == 24  # no subtree kept from the previous move
     with pytest.raises(ValueError):
-        early.run(chess.Board("k7/1Q6/1K6/8/8/8/8/8 b - - 0 1"), model)  # checkmated: terminal
+        tree.run(chess.Board("k7/1Q6/1K6/8/8/8/8/8 b - - 0 1"), model)  # checkmated: terminal
