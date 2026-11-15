@@ -157,7 +157,7 @@ max_think_time_s = 1.0
 max_plies = 150   # số nửa nước tối đa của ván (như tournament.max_plies), dùng khi bật mốc hòa
 
 # Benchmark 9 "NNUE" (module ai.benchmarks_extension.bench9): engine Stockfish 19 chính thức
-# (GPLv3, NNUE nhúng sẵn) chạy qua UCI — KHÔNG phải engine tự viết, xem documents/BENCH9.md. Hiện khi max_level >= 9.
+# (GPLv3, NNUE nhúng sẵn) chạy qua UCI — KHÔNG phải engine tự viết, xem documents/CONTEXT.md §4.9.5. Hiện khi max_level >= 9.
 # Cài engine một lần: python -m ai.benchmarks_extension.bench9.install (tải bản đã ghim + kiểm SHA-256).
 [bots.bench_super_alphabeta_nnue]
 display_name = "Benchmark 9 · Prime"   # tên hiển thị (mọi ngôn ngữ); xóa dòng để dùng tên trong locale
