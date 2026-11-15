@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -161,8 +162,29 @@ class App:
         """Return a localized bot name (no "(baseline)" marker)."""
         return self._translator.t(f"players.{bot_id}")
 
+    def _warm_up_bots(self) -> None:
+        """Create every listed bot once so heavy imports (PyTorch) load before the setup screens.
+
+        Runs in a daemon thread from ``run``; the setup screens then find the modules cached
+        instead of freezing the window on first open. Failures are left for those screens.
+        """
+        bot_ids = registry.list_bots(
+            include_debug=self.config.get("ui", {}).get("show_debug_bots", False),
+            include_benchmarks=True,
+            max_benchmark_level=registry.benchmark_level(self.config),
+            config=self.config,
+        )
+        for bot_id in bot_ids:
+            if not self._running:
+                return
+            try:
+                registry.create_bot(bot_id, self._bot_config(bot_id))
+            except Exception:  # noqa: BLE001 - reported later by the setup screens
+                pass
+
     def run(self) -> None:
         """Run the event loop until the window closes."""
+        threading.Thread(target=self._warm_up_bots, name="bot-warm-up", daemon=True).start()
         while self._running:
             self.render_frame()
             self.clock.tick(self.fps)
